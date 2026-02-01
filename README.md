@@ -31,11 +31,6 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 ## Screenshots 🖼️
 ![CF Performance Mirror – Profile Analysis](./screenshots/cf-mirror.png)
 
-## Contributing
-- Contributions welcome — open an issue or submit a PR.
-- Keep changes focused and include a short description of the problem/fix.
-- To test locally: edit `content.js`, reload the extension in chrome://extensions, and refresh a profile page.
-
 ## Motivation / Philosophy
 - Built for competitive programmers who want a private, quick snapshot of where they struggle and how long they take on problems.
 - Lightweight, focused on actionable insights rather than dashboards — no tracking, no servers.
