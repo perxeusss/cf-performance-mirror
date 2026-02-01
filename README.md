@@ -29,7 +29,7 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 - Inspect the source before installing if you want to verify behavior — the codebase is small and self-contained.
 
 ## Screenshots 🖼️
-- ` ./screenshots/cf-mirror.png`
+![CF Performance Mirror – Profile Analysis](./screenshots/cf-mirror.png)
 
 ## Contributing
 - Contributions welcome — open an issue or submit a PR.
