@@ -1,20 +1,17 @@
 (async function () {
   if (document.getElementById("cfpm-compact")) return;
 
-  // CONFIG
   const CATEGORIES = ["Div1","Div2","Div3","Div4","Global","Other"];
   const DEFAULT_CATEGORY = "Div4";
-  const DEFAULT_MODE = "total"; // total | rated | unrated
+  const DEFAULT_MODE = "total"; 
   const contestMap = {};
 
-  // RAW STORES
   let rawSubmissions = [];
   let ratedContestSet = new Set();
 
-  // default indices (A..H)
+  
   const DEFAULT_INDICES = ["A","B","C","D","E","F","G","H"];
 
-  // Build card
   const card = document.createElement("div");
   card.id = "cfpm-compact";
   card.style.cssText = [
@@ -30,11 +27,9 @@
     "max-width:920px"
   ].join(";");
 
-  // Controls row (no title)
   const controlsRow = document.createElement("div");
   controlsRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;";
 
-  // Left: category buttons
   const leftControls = document.createElement("div");
   leftControls.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;";
   const categoryButtons = {};
@@ -57,7 +52,7 @@
     leftControls.appendChild(b);
   });
 
-  // Right: mode dropdown (Total / Rated / Unrated)
+
   const rightControls = document.createElement("div");
   rightControls.style.cssText = "display:flex;align-items:center;gap:8px;";
   const modeSelect = document.createElement("select");
@@ -69,7 +64,7 @@
   });
   modeSelect.value = DEFAULT_MODE;
   modeSelect.style.cssText = "padding:6px;border-radius:6px;border:1px solid #ccc;font-size:13px;";
-  // Re-render current category on change
+  
   modeSelect.addEventListener("change", () => renderCategory(currentCategory || DEFAULT_CATEGORY));
   rightControls.appendChild(modeSelect);
 
@@ -77,13 +72,11 @@
   controlsRow.appendChild(rightControls);
   card.appendChild(controlsRow);
 
-  // Info line
   const info = document.createElement("div");
   info.style.cssText = "color:#666;font-size:13px;margin-bottom:8px;";
   info.textContent = "Loading data…";
   card.appendChild(info);
 
-  // Table wrapper
   const tableWrap = document.createElement("div");
   tableWrap.style.cssText = "overflow-x:auto;margin-bottom:12px;";
   const table = document.createElement("table");
@@ -91,7 +84,6 @@
   tableWrap.appendChild(table);
   card.appendChild(tableWrap);
 
-  // WA sections stacked
   const weakContest = document.createElement("div");
   weakContest.style.cssText = "margin-top:12px;border-top:1px solid #eee;padding-top:10px;";
   const weakGlobal = document.createElement("div");
@@ -100,7 +92,6 @@
   card.appendChild(weakContest);
   card.appendChild(weakGlobal);
 
-  // Insert card
   function insertCard() {
     const boxes = Array.from(document.querySelectorAll(".box"));
     const visible = boxes.filter(el => {
@@ -130,9 +121,9 @@
   // Helpers
   function median(arr) {
     if (!arr || arr.length === 0) return null;
-    const s = arr.slice().sort((a,b)=>a-b);
-    const m = Math.floor(s.length/2);
-    return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
+    const s = arr.slice().sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }
   function classifyContest(contest) {
     if (!contest || !contest.name) return "Other";
@@ -144,7 +135,6 @@
     return "Other";
   }
 
-  // Fetch contest.list
   async function fetchContests() {
     try {
       const res = await fetch("https://codeforces.com/api/contest.list");
@@ -153,24 +143,22 @@
         json.result.forEach(c => { contestMap[c.id] = c; });
       }
     } catch (e) {
-      // silently ignore contest list failure (timings may be partial)
+     
       info.textContent = "Contest metadata partially unavailable — timings may be partial.";
     }
   }
 
-  // Fetch rated contests set
   async function fetchRatedSet(handle) {
     try {
       const r = await fetch(`https://codeforces.com/api/user.rating?handle=${handle}`);
       const d = await r.json();
       if (d.status === "OK") return new Set(d.result.map(x => x.contestId));
     } catch (e) {
-      // fallback to empty set
+      
     }
     return new Set();
   }
 
-  // Fetch submissions & rated set
   async function fetchAndStore(handle) {
     try {
       info.textContent = "Fetching submissions…";
@@ -189,7 +177,6 @@
     }
   }
 
-  // Recompute dataset for mode
   function recalcForMode(mode) {
     const inWindowSet = new Set();
     rawSubmissions.forEach(s => {
@@ -251,7 +238,6 @@
       if (timeMin >= 0 && timeMin <= maxAllowed) categoryIndexTimes[cat][idx].push(timeMin);
     });
 
-    // contest friction
     const contestFriction = [];
     Object.keys(topicAttemptsLocal).forEach(t => {
       const a = topicAttemptsLocal[t] || 0, s = topicSolvedLocal[t] || 0;
@@ -260,7 +246,6 @@
     });
     contestFriction.sort((x,y) => y.waRatio - x.waRatio);
 
-    // global friction
     const globalAttempts = {};
     const globalSolved = {};
     rawSubmissions.forEach(s => {
@@ -286,7 +271,6 @@
     };
   }
 
-  // Render helpers: WA lists now two-column grid, show up to 12 items
   function renderWeakTopics(container, heading, list) {
     container.innerHTML = "";
     const h = document.createElement("div");
@@ -308,7 +292,7 @@
       const r = document.createElement("div");
       r.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:2px 0;min-height:20px;";
       const name = document.createElement("div");
-      name.style.cssText = "font-weight:500;color:#444;font-size:13px;"; // lighter
+      name.style.cssText = "font-weight:500;color:#444;font-size:13px;"; 
       name.textContent = t.topic;
       const stats = document.createElement("div");
       let color = "#e74c3c";
@@ -356,7 +340,6 @@
       return;
     }
 
-    // Avg row
     const avgRow = document.createElement("tr");
     const avgLbl = document.createElement("td");
     avgLbl.style.cssText = "padding:6px 8px;color:#666;font-size:12px;font-weight:600;";
@@ -366,12 +349,11 @@
       const arr = idxTimes[idx] || [];
       const td = document.createElement("td");
       td.style.cssText = "text-align:center;padding:6px 8px;font-weight:700;color:#1652d6;";
-      td.textContent = arr.length > 0 ? String(Math.round((arr.reduce((a,b)=>a+b,0)/arr.length) * 10) / 10) : "—";
+      td.textContent = arr.length > 0 ? String(Math.round((arr.reduce((a,b) => a + b, 0) / arr.length ) * 10) / 10) : "—";
       avgRow.appendChild(td);
     });
     table.appendChild(avgRow);
-
-    // Median row
+    
     const medRow = document.createElement("tr");
     const medLbl = document.createElement("td");
     medLbl.style.cssText = "padding:6px 8px;color:#666;font-size:12px;font-weight:600;border-top:1px solid #f0f0f0;";
@@ -387,7 +369,7 @@
     });
     table.appendChild(medRow);
 
-    // Solved row
+
     const solvedRow = document.createElement("tr");
     const solvedLbl = document.createElement("td");
     solvedLbl.style.cssText = "padding:6px 8px;color:#666;font-size:12px;font-weight:600;border-top:1px solid #f0f0f0;";
@@ -401,7 +383,6 @@
     });
     table.appendChild(solvedRow);
 
-    // Attempts row
     const attRow = document.createElement("tr");
     const attLbl = document.createElement("td");
     attLbl.style.cssText = "padding:6px 8px;color:#666;font-size:12px;font-weight:600;";
@@ -416,13 +397,11 @@
     table.appendChild(attRow);
   }
 
-  // current category tracker
   let currentCategory = DEFAULT_CATEGORY;
 
-  // Render category
   function renderCategory(cat) {
     currentCategory = cat;
-    // highlight buttons
+  
     Object.keys(categoryButtons).forEach(k => {
       const b = categoryButtons[k];
       if (k === cat) {
@@ -445,12 +424,10 @@
 
     renderTableForCategory(modeData, cat);
 
-    // stacked WA headings and two-column lists
     renderWeakTopics(weakContest, "High WA% (Contest)", modeData.contestFriction);
     renderWeakTopics(weakGlobal, "High WA% (Overall)", modeData.globalFriction);
   }
 
-  // Kickoff
   const handle = (window.location.pathname.split("/")[2] || "").trim();
   if (!handle) {
     info.textContent = "Could not detect username in URL.";
@@ -461,7 +438,6 @@
   const ok = await fetchAndStore(handle);
   if (!ok) return;
 
-  // initial render
   renderCategory(DEFAULT_CATEGORY);
 
 })();
