@@ -4,6 +4,7 @@
   const CATEGORIES = ["Div1", "Div2", "Div3", "Div4", "Other"];
   const DEFAULT_CATEGORY = "Div4";
   const DEFAULT_MODE = "total";
+  const DEFAULT_TIMELINE = "all";
   const contestMap = {};
 
   let rawSubmissions = [];
@@ -55,7 +56,27 @@
 
 
   const rightControls = document.createElement("div");
-  rightControls.style.cssText = "display:flex;align-items:center;gap:8px;";
+  rightControls.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap;";
+  
+  const timelineSelect = document.createElement("select");
+  const timelineOptions = [
+    { value: "all", label: "All Time" },
+    { value: "1", label: "Last Month" },
+    { value: "3", label: "Last 3 Months" },
+    { value: "6", label: "Last 6 Months" },
+    { value: "12", label: "Last Year" },
+    { value: "24", label: "Last 2 Years" }
+  ];
+  timelineOptions.forEach(opt => {
+    const o = document.createElement("option");
+    o.value = opt.value;
+    o.textContent = opt.label;
+    timelineSelect.appendChild(o);
+  });
+  timelineSelect.value = DEFAULT_TIMELINE;
+  timelineSelect.style.cssText = "padding:6px;border-radius:6px;border:1px solid #ccc;font-size:13px;";
+  timelineSelect.addEventListener("change", () => renderCategory(currentCategory || DEFAULT_CATEGORY));
+  
   const modeSelect = document.createElement("select");
   ["total", "rated", "unrated"].forEach(opt => {
     const o = document.createElement("option");
@@ -65,8 +86,9 @@
   });
   modeSelect.value = DEFAULT_MODE;
   modeSelect.style.cssText = "padding:6px;border-radius:6px;border:1px solid #ccc;font-size:13px;";
-
   modeSelect.addEventListener("change", () => renderCategory(currentCategory || DEFAULT_CATEGORY));
+  
+  rightControls.appendChild(timelineSelect);
   rightControls.appendChild(modeSelect);
 
   controlsRow.appendChild(leftControls);
@@ -164,7 +186,6 @@
     if (!contest || !contest.name) return "Other";
     const n = String(contest.name);
 
-    // Treat Global rounds as Div1+Div2
     if (/Div\.?\s*1\s*\+\s*Div\.?\s*2/i.test(n) || 
         /Div\.?\s*2\s*\+\s*Div\.?\s*1/i.test(n) ||
         /Global/i.test(n)) {
@@ -187,7 +208,6 @@
         json.result.forEach(c => { contestMap[c.id] = c; });
       }
     } catch (e) {
-
       info.textContent = "Contest metadata partially unavailable — timings may be partial.";
     }
   }
@@ -225,10 +245,20 @@
     }
   }
 
-  function recalcForMode(mode) {
+  function recalcForMode(mode, timelineMonths) {
+   
+    const now = Math.floor(Date.now() / 1000);
+    const cutoffTime = timelineMonths === "all" ? 0 : now - (parseInt(timelineMonths) * 30 * 24 * 60 * 60);
+    
+    const filteredSubmissions = timelineMonths === "all" 
+      ? rawSubmissions 
+      : rawSubmissions.filter(s => {
+          if (!s.creationTimeSeconds) return false;
+          return s.creationTimeSeconds >= cutoffTime;
+        });
    
     const inWindowSet = new Set();
-    rawSubmissions.forEach(s => {
+    filteredSubmissions.forEach(s => {
       if (!s.problem) return;
       const cid = s.problem.contestId;
       const c = contestMap[cid];
@@ -245,6 +275,17 @@
     } else {
       inWindowSet.forEach(cid => { if (!ratedContestSet.has(cid)) participated.add(cid); });
     }
+    
+    if (timelineMonths !== "all") {
+      const timeFilteredParticipated = new Set();
+      participated.forEach(cid => {
+        const contest = contestMap[cid];
+        if (contest && contest.startTimeSeconds >= cutoffTime) {
+          timeFilteredParticipated.add(cid);
+        }
+      });
+      participated = timeFilteredParticipated;
+    }
 
     const categoryIndexTimes = {};
     const categoryIndexAttempts = {};
@@ -255,7 +296,7 @@
     const firstAC = new Set();
 
     const subsByContest = {};
-    rawSubmissions.forEach(s => {
+    filteredSubmissions.forEach(s => {
       if (!s.problem) return;
       const cid = s.problem.contestId;
       if (!participated.has(cid)) return; 
@@ -275,7 +316,7 @@
       }
     });
 
-    rawSubmissions.forEach(s => {
+    filteredSubmissions.forEach(s => {
       if (!s.problem) return;
       const cid = s.problem.contestId;
       if (!participated.has(cid)) return;
@@ -330,7 +371,7 @@
 
     const globalAttempts = {};
     const globalSolved = {};
-    rawSubmissions.forEach(s => {
+    filteredSubmissions.forEach(s => {
       if (!s.problem) return;
       const tags = s.problem.tags || [];
       tags.forEach(t => globalAttempts[t] = (globalAttempts[t] || 0) + 1);
@@ -498,11 +539,13 @@
     });
 
     const mode = modeSelect.value;
+    const timeline = timelineSelect.value;
     info.textContent = "Rendering (" + mode + ")…";
 
-    const modeData = recalcForMode(mode);
+    const modeData = recalcForMode(mode, timeline);
 
-    info.textContent = `Participated in ${modeData.participatedCount} contests (${mode[0].toUpperCase() + mode.slice(1)})`;
+    const timelineLabel = timelineSelect.options[timelineSelect.selectedIndex].text;
+    info.textContent = `Participated in ${modeData.participatedCount} contests (${mode[0].toUpperCase() + mode.slice(1)} · ${timelineLabel})`;
 
     renderTableForCategory(modeData, cat);
 
