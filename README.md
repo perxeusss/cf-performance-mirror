@@ -33,7 +33,11 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 - Inspect the source before installing if you want to verify behavior — the codebase is small and self-contained.
 
 ## Screenshots 🖼️
-![CF Performance Mirror – Profile Analysis](./screenshots/cf-mirror.png)
+![CF Performance Mirror – Installation](./screenshots/installation_page.png)
+
+![CF Performance Mirror – Contest-wise Timing](./screenshots/contest_wise_timing.png)
+
+![CF Performance Mirror – Contest-wise & Global WA Analysis](./screenshots/contest_wise_and_global_wa_analysis.png)
 
 ## Motivation / Philosophy
 - Built for competitive programmers who want a private, quick snapshot of where they struggle and how long they take on problems.
