@@ -5,6 +5,9 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 
 - [Install CF Performance Mirror](https://chromewebstore.google.com/detail/cf-performance-mirror/lpbkkcofbkmghobeeeipbdgohbckcdgj)
 
+![CF Performance Mirror – Installation](./screenshots/installation_page.png)
+
+
 ## Features
 - Average & median solve time per problem index (A–H)
 - Division-wise breakdown (Div1–Div4, Global, Other)
@@ -33,7 +36,6 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 - Inspect the source before installing if you want to verify behavior — the codebase is small and self-contained.
 
 ## Screenshots 🖼️
-![CF Performance Mirror – Installation](./screenshots/installation_page.png)
 
 ![CF Performance Mirror – Contest-wise Timing](./screenshots/contest_wise_timing.png)
 
