@@ -21,5 +21,11 @@
   "host_permissions": [
     "https://codeforces.com/*",
     "https://*.codeforces.com/*"
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "cfmirror@perxeusss",
+      "strict_min_version": "109.0"
+    }
+  }
 }
