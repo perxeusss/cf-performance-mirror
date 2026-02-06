@@ -9,10 +9,65 @@
 
   let rawSubmissions = [];
   let ratedContestSet = new Set();
-  let userRatingHistory = []; 
-
+  let userRatingHistory = [];
 
   const DEFAULT_INDICES = ["A", "B", "C", "D", "E", "F", "G", "H"];
+
+  function detectDarkMode() {
+    const hasDarkClass = document.documentElement.classList.contains('dark') || 
+                        document.documentElement.classList.contains('dark-mode') ||
+                        document.body.classList.contains('dark') ||
+                        document.body.classList.contains('dark-mode');
+    
+    if (hasDarkClass) return true;
+
+    const containers = [
+      document.querySelector('.datatable'),
+      document.querySelector('.roundbox'),
+      document.querySelector('#pageContent'),
+      document.querySelector('.second-level-menu-list'),
+      document.body
+    ];
+
+    for (let container of containers) {
+      if (container) {
+        const bg = window.getComputedStyle(container).backgroundColor;
+        if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+          const rgb = bg.match(/\d+/g);
+          if (rgb && rgb.length >= 3) {
+            const brightness = (parseInt(rgb[0]) * 299 + parseInt(rgb[1]) * 587 + parseInt(rgb[2]) * 114) / 1000;
+            if (brightness < 128) return true;
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  const isDark = detectDarkMode();
+  
+  const theme = {
+    bg: 'transparent',
+    text: isDark ? '#e8e8e8' : '#0b1220',
+    border: isDark ? '#555' : '#ddd',
+    borderLight: isDark ? '#444' : '#eee',
+    borderLighter: isDark ? '#333' : '#f0f0f0',
+    muted: isDark ? '#aaa' : '#666',
+    headingText: isDark ? '#ddd' : '#222',
+    buttonBg: isDark ? '#3a3a3a' : '#f5f5f5',
+    buttonText: isDark ? '#ddd' : '#333',
+    buttonBorder: isDark ? '#555' : '#ccc',
+    activeButtonBg: '#1652d6',
+    activeButtonText: '#fff',
+    tableHeaderText: isDark ? '#ccc' : '#666',
+    tableCellText: isDark ? '#ddd' : '#444',
+    emptyText: isDark ? '#777' : '#999',
+    selectBg: isDark ? '#2a2a2a' : '#fff',
+    selectText: isDark ? '#ddd' : '#333',
+    selectBorder: isDark ? '#555' : '#ccc',
+    weakTopicName: isDark ? '#ccc' : '#444'
+  };
 
   const card = document.createElement("div");
   card.id = "cfpm-compact";
@@ -20,9 +75,9 @@
     "box-sizing:border-box",
     "font-family:Arial,sans-serif",
     "font-size:14px",
-    "color:#0b1220",
-    "background:#fff",
-    "border:1px solid #ddd",
+    `color:${theme.text}`,
+    `background:${theme.bg}`,
+    `border:1px solid ${theme.border}`,
     "border-radius:6px",
     "padding:12px",
     "margin-top:10px",
@@ -42,9 +97,9 @@
     b.style.cssText = [
       "padding:4px 10px",
       "border-radius:12px",
-      "border:1px solid #ccc",
-      "background:#f5f5f5",
-      "color:#333",
+      `border:1px solid ${theme.buttonBorder}`,
+      `background:${theme.buttonBg}`,
+      `color:${theme.buttonText}`,
       "cursor:pointer",
       "font-weight:600",
       "font-size:13px"
@@ -54,10 +109,9 @@
     leftControls.appendChild(b);
   });
 
-
   const rightControls = document.createElement("div");
   rightControls.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap;";
-  
+
   const timelineSelect = document.createElement("select");
   const timelineOptions = [
     { value: "all", label: "All Time" },
@@ -74,9 +128,9 @@
     timelineSelect.appendChild(o);
   });
   timelineSelect.value = DEFAULT_TIMELINE;
-  timelineSelect.style.cssText = "padding:6px;border-radius:6px;border:1px solid #ccc;font-size:13px;";
+  timelineSelect.style.cssText = `padding:6px;border-radius:6px;border:1px solid ${theme.selectBorder};background:${theme.selectBg};color:${theme.selectText};font-size:13px;`;
   timelineSelect.addEventListener("change", () => renderCategory(currentCategory || DEFAULT_CATEGORY));
-  
+
   const modeSelect = document.createElement("select");
   ["total", "rated", "unrated"].forEach(opt => {
     const o = document.createElement("option");
@@ -85,9 +139,9 @@
     modeSelect.appendChild(o);
   });
   modeSelect.value = DEFAULT_MODE;
-  modeSelect.style.cssText = "padding:6px;border-radius:6px;border:1px solid #ccc;font-size:13px;";
+  modeSelect.style.cssText = `padding:6px;border-radius:6px;border:1px solid ${theme.selectBorder};background:${theme.selectBg};color:${theme.selectText};font-size:13px;`;
   modeSelect.addEventListener("change", () => renderCategory(currentCategory || DEFAULT_CATEGORY));
-  
+
   rightControls.appendChild(timelineSelect);
   rightControls.appendChild(modeSelect);
 
@@ -96,7 +150,7 @@
   card.appendChild(controlsRow);
 
   const info = document.createElement("div");
-  info.style.cssText = "color:#666;font-size:13px;margin-bottom:8px;";
+  info.style.cssText = `color:${theme.muted};font-size:13px;margin-bottom:8px;`;
   info.textContent = "Loading data…";
   card.appendChild(info);
 
@@ -108,9 +162,9 @@
   card.appendChild(tableWrap);
 
   const weakContest = document.createElement("div");
-  weakContest.style.cssText = "margin-top:12px;border-top:1px solid #eee;padding-top:10px;";
+  weakContest.style.cssText = `margin-top:12px;border-top:1px solid ${theme.borderLight};padding-top:10px;`;
   const weakGlobal = document.createElement("div");
-  weakGlobal.style.cssText = "margin-top:12px;border-top:1px solid #eee;padding-top:10px;";
+  weakGlobal.style.cssText = `margin-top:12px;border-top:1px solid ${theme.borderLight};padding-top:10px;`;
 
   card.appendChild(weakContest);
   card.appendChild(weakGlobal);
@@ -150,7 +204,7 @@
 
   function decideUserDivisionForContest(cid, contest, subs, isUnofficial) {
     if (!contest || typeof contest.startTimeSeconds !== "number") {
-      return "Div2"; 
+      return "Div2";
     }
 
     subs = Array.isArray(subs) ? subs : [];
@@ -186,9 +240,9 @@
     if (!contest || !contest.name) return "Other";
     const n = String(contest.name);
 
-    if (/Div\.?\s*1\s*\+\s*Div\.?\s*2/i.test(n) || 
-        /Div\.?\s*2\s*\+\s*Div\.?\s*1/i.test(n) ||
-        /Global/i.test(n)) {
+    if (/Div\.?\s*1\s*\+\s*Div\.?\s*2/i.test(n) ||
+      /Div\.?\s*2\s*\+\s*Div\.?\s*1/i.test(n) ||
+      /Global/i.test(n)) {
       return "Div1+Div2";
     }
 
@@ -196,7 +250,7 @@
 
     const m = n.match(/Div\.?\s*([1-4])|Division\s*([1-4])/i);
     if (m) return "Div" + (m[1] || m[2]);
-    
+
     return "Other";
   }
 
@@ -217,11 +271,11 @@
       const r = await fetch(`https://codeforces.com/api/user.rating?handle=${handle}`);
       const d = await r.json();
       if (d.status === "OK") {
-        userRatingHistory = d.result || []; 
+        userRatingHistory = d.result || [];
         return new Set(d.result.map(x => x.contestId));
       }
     } catch (e) {
-     
+
     }
     userRatingHistory = [];
     return new Set();
@@ -246,17 +300,17 @@
   }
 
   function recalcForMode(mode, timelineMonths) {
-   
+
     const now = Math.floor(Date.now() / 1000);
     const cutoffTime = timelineMonths === "all" ? 0 : now - (parseInt(timelineMonths) * 30 * 24 * 60 * 60);
-    
-    const filteredSubmissions = timelineMonths === "all" 
-      ? rawSubmissions 
+
+    const filteredSubmissions = timelineMonths === "all"
+      ? rawSubmissions
       : rawSubmissions.filter(s => {
-          if (!s.creationTimeSeconds) return false;
-          return s.creationTimeSeconds >= cutoffTime;
-        });
-   
+        if (!s.creationTimeSeconds) return false;
+        return s.creationTimeSeconds >= cutoffTime;
+      });
+
     const inWindowSet = new Set();
     filteredSubmissions.forEach(s => {
       if (!s.problem) return;
@@ -275,7 +329,7 @@
     } else {
       inWindowSet.forEach(cid => { if (!ratedContestSet.has(cid)) participated.add(cid); });
     }
-    
+
     if (timelineMonths !== "all") {
       const timeFilteredParticipated = new Set();
       participated.forEach(cid => {
@@ -299,12 +353,12 @@
     filteredSubmissions.forEach(s => {
       if (!s.problem) return;
       const cid = s.problem.contestId;
-      if (!participated.has(cid)) return; 
+      if (!participated.has(cid)) return;
       const contest = contestMap[cid];
       if (!contest || typeof contest.startTimeSeconds !== "number" || typeof contest.durationSeconds !== "number") return;
       const start = contest.startTimeSeconds, end = start + contest.durationSeconds;
       const st = s.creationTimeSeconds;
-      if (typeof st !== "number" || st < start || st > end) return; 
+      if (typeof st !== "number" || st < start || st > end) return;
       subsByContest[cid] = subsByContest[cid] || [];
       subsByContest[cid].push(s);
     });
@@ -338,7 +392,7 @@
         const isUnofficial = unofficialContests.has(cid);
         cat = decideUserDivisionForContest(cid, contest, subsByContest[cid], isUnofficial);
       }
-     
+
       if (!categoryIndexAttempts[cat]) {
         console.warn("Unknown category encountered, falling back to Other:", cat, " (cid:", cid, ")");
         cat = "Other";
@@ -397,12 +451,12 @@
   function renderWeakTopics(container, heading, list) {
     container.innerHTML = "";
     const h = document.createElement("div");
-    h.style.cssText = "font-weight:600;margin-bottom:8px;color:#222;font-size:14px;";
+    h.style.cssText = `font-weight:600;margin-bottom:8px;color:${theme.headingText};font-size:14px;`;
     h.textContent = heading;
     container.appendChild(h);
     if (!list || !list.length) {
       const empty = document.createElement("div");
-      empty.style.cssText = "color:#999;font-style:italic;";
+      empty.style.cssText = `color:${theme.emptyText};font-style:italic;`;
       empty.textContent = "No data";
       container.appendChild(empty);
       return;
@@ -415,7 +469,7 @@
       const r = document.createElement("div");
       r.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:2px 0;min-height:20px;";
       const name = document.createElement("div");
-      name.style.cssText = "font-weight:500;color:#444;font-size:13px;";
+      name.style.cssText = `font-weight:500;color:${theme.weakTopicName};font-size:13px;`;
       name.textContent = t.topic;
       const stats = document.createElement("div");
       let color = "#e74c3c";
@@ -441,12 +495,12 @@
     table.innerHTML = "";
     const headRow = document.createElement("tr");
     const corner = document.createElement("th");
-    corner.style.cssText = "text-align:left;padding:6px 8px;color:#666;font-weight:600;border-bottom:2px solid #eee;";
+    corner.style.cssText = `text-align:left;padding:6px 8px;color:${theme.tableHeaderText};font-weight:600;border-bottom:2px solid ${theme.borderLight};`;
     corner.textContent = cat;
     headRow.appendChild(corner);
     allIdx.forEach(idx => {
       const th = document.createElement("th");
-      th.style.cssText = "text-align:center;padding:6px 8px;font-weight:700;color:#222;border-bottom:2px solid #eee;";
+      th.style.cssText = `text-align:center;padding:6px 8px;font-weight:700;color:${theme.headingText};border-bottom:2px solid ${theme.borderLight};`;
       th.textContent = idx;
       headRow.appendChild(th);
     });
@@ -456,7 +510,7 @@
       const eRow = document.createElement("tr");
       const eTd = document.createElement("td");
       eTd.colSpan = 2;
-      eTd.style.cssText = "padding:12px 8px;color:#999;font-style:italic;";
+      eTd.style.cssText = `padding:12px 8px;color:${theme.emptyText};font-style:italic;`;
       eTd.textContent = "No contest data for " + cat + ".";
       eRow.appendChild(eTd);
       table.appendChild(eRow);
@@ -465,7 +519,7 @@
 
     const avgRow = document.createElement("tr");
     const avgLbl = document.createElement("td");
-    avgLbl.style.cssText = "padding:6px 8px;color:#666;font-size:12px;font-weight:600;";
+    avgLbl.style.cssText = `padding:6px 8px;color:${theme.tableHeaderText};font-size:12px;font-weight:600;`;
     avgLbl.textContent = "Avg min";
     avgRow.appendChild(avgLbl);
     allIdx.forEach(idx => {
@@ -479,13 +533,13 @@
 
     const medRow = document.createElement("tr");
     const medLbl = document.createElement("td");
-    medLbl.style.cssText = "padding:6px 8px;color:#666;font-size:12px;font-weight:600;border-top:1px solid #f0f0f0;";
+    medLbl.style.cssText = `padding:6px 8px;color:${theme.tableHeaderText};font-size:12px;font-weight:600;border-top:1px solid ${theme.borderLighter};`;
     medLbl.textContent = "Med min";
     medRow.appendChild(medLbl);
     allIdx.forEach(idx => {
       const arr = idxTimes[idx] || [];
       const td = document.createElement("td");
-      td.style.cssText = "text-align:center;padding:6px 8px;font-weight:700;color:#6b4fa0;border-top:1px solid #f0f0f0;";
+      td.style.cssText = `text-align:center;padding:6px 8px;font-weight:700;color:#6b4fa0;border-top:1px solid ${theme.borderLighter};`;
       const m = median(arr);
       td.textContent = m !== null ? String(Math.round(m * 10) / 10) : "—";
       medRow.appendChild(td);
@@ -495,12 +549,12 @@
 
     const solvedRow = document.createElement("tr");
     const solvedLbl = document.createElement("td");
-    solvedLbl.style.cssText = "padding:6px 8px;color:#666;font-size:12px;font-weight:600;border-top:1px solid #f0f0f0;";
+    solvedLbl.style.cssText = `padding:6px 8px;color:${theme.tableHeaderText};font-size:12px;font-weight:600;border-top:1px solid ${theme.borderLighter};`;
     solvedLbl.textContent = "Solved";
     solvedRow.appendChild(solvedLbl);
     allIdx.forEach(idx => {
       const td = document.createElement("td");
-      td.style.cssText = "text-align:center;padding:6px 8px;color:#444;border-top:1px solid #f0f0f0;";
+      td.style.cssText = `text-align:center;padding:6px 8px;color:${theme.tableCellText};border-top:1px solid ${theme.borderLighter};`;
       td.textContent = String((idxTimes[idx] || []).length);
       solvedRow.appendChild(td);
     });
@@ -508,12 +562,12 @@
 
     const attRow = document.createElement("tr");
     const attLbl = document.createElement("td");
-    attLbl.style.cssText = "padding:6px 8px;color:#666;font-size:12px;font-weight:600;";
+    attLbl.style.cssText = `padding:6px 8px;color:${theme.tableHeaderText};font-size:12px;font-weight:600;`;
     attLbl.textContent = "Attempts";
     attRow.appendChild(attLbl);
     allIdx.forEach(idx => {
       const td = document.createElement("td");
-      td.style.cssText = "text-align:center;padding:6px 8px;color:#444;";
+      td.style.cssText = `text-align:center;padding:6px 8px;color:${theme.tableCellText};`;
       td.textContent = String(idxAttempts[idx] || 0);
       attRow.appendChild(td);
     });
@@ -528,13 +582,13 @@
     Object.keys(categoryButtons).forEach(k => {
       const b = categoryButtons[k];
       if (k === cat) {
-        b.style.background = "#1652d6";
-        b.style.color = "#fff";
-        b.style.border = "1px solid #1652d6";
+        b.style.background = theme.activeButtonBg;
+        b.style.color = theme.activeButtonText;
+        b.style.border = `1px solid ${theme.activeButtonBg}`;
       } else {
-        b.style.background = "#f5f5f5";
-        b.style.color = "#333";
-        b.style.border = "1px solid #ccc";
+        b.style.background = theme.buttonBg;
+        b.style.color = theme.buttonText;
+        b.style.border = `1px solid ${theme.buttonBorder}`;
       }
     });
 
