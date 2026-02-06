@@ -45,12 +45,51 @@
     return false;
   }
 
+  function getBoxBackground() {
+    const roundbox = document.querySelector('.roundbox');
+    if (roundbox) {
+      const bg = window.getComputedStyle(roundbox).backgroundColor;
+      if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+        return bg;
+      }
+    }
+    
+    const pageContent = document.querySelector('#pageContent');
+    if (pageContent) {
+      const bg = window.getComputedStyle(pageContent).backgroundColor;
+      if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+        return bg;
+      }
+    }
+    
+    const bodyBg = window.getComputedStyle(document.body).backgroundColor;
+    if (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') {
+      return bodyBg;
+    }
+    
+    return isDark ? 'rgb(40, 40, 40)' : 'rgb(255, 255, 255)';
+  }
+
+  function getBoxBorderColor() {
+    const roundbox = document.querySelector('.roundbox');
+    if (roundbox) {
+      const borderColor = window.getComputedStyle(roundbox).borderColor;
+      if (borderColor && borderColor !== 'rgba(0, 0, 0, 0)' && borderColor !== 'transparent') {
+        return borderColor;
+      }
+    }
+    
+    return isDark ? '#555' : '#ddd';
+  }
+
   const isDark = detectDarkMode();
+  const boxBg = getBoxBackground();
+  const boxBorderColor = getBoxBorderColor();
   
   const theme = {
-    bg: 'transparent',
+    bg: boxBg,
     text: isDark ? '#e8e8e8' : '#0b1220',
-    border: isDark ? '#555' : '#ddd',
+    border: boxBorderColor,
     borderLight: isDark ? '#444' : '#eee',
     borderLighter: isDark ? '#333' : '#f0f0f0',
     muted: isDark ? '#aaa' : '#666',
@@ -180,6 +219,19 @@
       const w = Math.round(last.getBoundingClientRect().width);
       card.style.width = (w > 220 ? (w + "px") : "880px");
       last.insertAdjacentElement("afterend", card);
+      
+      if (window.ResizeObserver) {
+        const resizeObserver = new ResizeObserver(entries => {
+          for (let entry of entries) {
+            const newWidth = Math.round(entry.contentRect.width);
+            if (newWidth > 220) {
+              card.style.width = newWidth + "px";
+            }
+          }
+        });
+        resizeObserver.observe(last);
+      }
+      
       return true;
     }
     const main = document.querySelector("#pageContent, #mainContent, .mainContent, .content");
@@ -187,6 +239,19 @@
       const w = Math.round(main.getBoundingClientRect().width);
       card.style.width = (w > 220 ? (w + "px") : "880px");
       main.appendChild(card);
+      
+      if (window.ResizeObserver) {
+        const resizeObserver = new ResizeObserver(entries => {
+          for (let entry of entries) {
+            const newWidth = Math.round(entry.contentRect.width);
+            if (newWidth > 220) {
+              card.style.width = newWidth + "px";
+            }
+          }
+        });
+        resizeObserver.observe(main);
+      }
+      
       return true;
     }
     document.body.appendChild(card);
