@@ -2,12 +2,16 @@
   "manifest_version": 3,
   "name": "CF Performance Mirror",
   "description": "Contest-wise average & median solve time and WA% friction on Codeforces profiles.",
-  "version": "1.0.1",
+  "version": "1.0.2",
+
+  "minimum_chrome_version": "109.0",
+
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+
   "content_scripts": [
     {
       "matches": [
@@ -18,18 +22,16 @@
       "run_at": "document_idle"
     }
   ],
+
   "host_permissions": [
     "https://codeforces.com/*",
     "https://*.codeforces.com/*"
   ],
+
   "browser_specific_settings": {
     "gecko": {
       "id": "cfmirror@perxeusss",
-      "strict_min_version": "109.0",
-      "data_collection_permissions": {
-        "required": [],
-        "optional": []
-      }
+      "strict_min_version": "109.0"
     }
   }
 }
