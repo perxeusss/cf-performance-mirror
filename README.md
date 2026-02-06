@@ -10,14 +10,16 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 
 ## Features
 - Average & median solve time per problem index (A–H)
-- Division-wise breakdown (Div1–Div4, Div1+Div2, Other)
+- Division-wise breakdown (Div1–Div4, Other)
+  - Div1+Div2 / Global contests are automatically treated as Div1 or Div2 based on your rating history
 - Time window selector: All time • Last 1/3/6/12/24 months
-- Mode switch: Total • Rated • Unrated
+  - Applies to both contest analytics and global WA% friction
+- Mode switch: Total • Rated • Unrated (based on Codeforces contest rating data)
 - High WA% (wrong-attempt percentage) topics for:
-  - Contest submissions (only contests you participated in, within contest time window)
-  - Overall submissions (all Codeforces practice + contest submissions)
-- Shows unsolved problem indices in the table
-- Automatically adapts to Codeforces light/dark themes with compact, native-looking UI
+  - Contest submissions (only contests you participated in, within the selected time window)
+  - Overall submissions (all Codeforces practice + contest submissions, within the same window)
+- Shows unsolved problem indices (A–H) explicitly in the table
+- Automatically adapts to Codeforces light/dark themes and surrounding profile styles, keeping a compact, native-looking UI
 
 ## Quick install (Load unpacked)
 1. Clone or download this repository to a local folder.
