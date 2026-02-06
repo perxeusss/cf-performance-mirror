@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CF Performance Mirror",
-  "description": "Analyze your Codeforces performance with solve-time stats, WA% insights, time-slot tracking, and smart division detection — all in one extension.",
+  "description": "Analyze Codeforces profiles with contest-wise solve time, WA% friction, and time-range filters — compact, non-intrusive.",
   "version": "1.0.7",
   "icons": {
     "16": "icons/icon16.png",

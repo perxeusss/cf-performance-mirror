@@ -459,7 +459,6 @@
       }
 
       if (!categoryIndexAttempts[cat]) {
-        console.warn("Unknown category encountered, falling back to Other:", cat, " (cid:", cid, ")");
         cat = "Other";
         categoryIndexAttempts[cat] = categoryIndexAttempts[cat] || {};
         categoryIndexTimes[cat] = categoryIndexTimes[cat] || {};
