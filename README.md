@@ -40,8 +40,6 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 
 ## Screenshots 🖼️
 
-![CF Performance Mirror – Full UI](./screenshots/full_ui.png)
-
 ![CF Performance Mirror – Contest type / mode switch](./screenshots/contest_type_highlighted.png)
 
 ![CF Performance Mirror – Timeline selector & WA friction](./screenshots/contest_timeslot_highlighted.png)
