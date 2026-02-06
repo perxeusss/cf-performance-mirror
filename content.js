@@ -81,14 +81,6 @@
   }
 
   function getBoxBorderColor() {
-    const infoBox = document.querySelector('.info');
-    if (infoBox) {
-      const borderColor = window.getComputedStyle(infoBox).borderColor;
-      if (borderColor && borderColor !== 'rgba(0, 0, 0, 0)' && borderColor !== 'transparent') {
-        return borderColor;
-      }
-    }
-
     const roundbox = document.querySelector('.roundbox');
     if (roundbox) {
       const borderColor = window.getComputedStyle(roundbox).borderColor;
@@ -97,8 +89,24 @@
       }
     }
 
+    const infoBox = document.querySelector('.info');
+    if (infoBox) {
+      const borderColor = window.getComputedStyle(infoBox).borderColor;
+      if (borderColor && borderColor !== 'rgba(0, 0, 0, 0)' && borderColor !== 'transparent') {
+        return borderColor;
+      }
+    }
+
+    const datatable = document.querySelector('.datatable');
+    if (datatable) {
+      const borderColor = window.getComputedStyle(datatable).borderColor;
+      if (borderColor && borderColor !== 'rgba(0, 0, 0, 0)' && borderColor !== 'transparent') {
+        return borderColor;
+      }
+    }
+
     const isDarkFallback = detectDarkMode();
-    return isDarkFallback ? '#555' : '#ddd';
+    return isDarkFallback ? '#444' : '#d4d4d4';
   }
   function createTheme() {
     const isDark = detectDarkMode();
@@ -288,6 +296,100 @@
     card.style.border = `1px solid ${theme.border}`;
     card.style.color = theme.text;
   }, 100);
+
+  let previousTheme = {
+    isDark: detectDarkMode(),
+    bg: theme.bg,
+    border: theme.border
+  };
+
+  function updateTheme() {
+    const newIsDark = detectDarkMode();
+    const newTheme = createTheme();
+
+    if (newIsDark !== previousTheme.isDark ||
+      newTheme.bg !== previousTheme.bg ||
+      newTheme.border !== previousTheme.border) {
+
+      theme = newTheme;
+      previousTheme = {
+        isDark: newIsDark,
+        bg: theme.bg,
+        border: theme.border
+      };
+
+      card.style.background = theme.bg;
+      card.style.border = `1px solid ${theme.border}`;
+      card.style.color = theme.text;
+
+      info.style.color = theme.muted;
+
+      weakContest.style.borderTop = `1px solid ${theme.borderLight}`;
+      weakGlobal.style.borderTop = `1px solid ${theme.borderLight}`;
+
+      Object.keys(categoryButtons).forEach(k => {
+        const b = categoryButtons[k];
+        if (k === currentCategory) {
+          b.style.background = theme.activeButtonBg;
+          b.style.color = theme.activeButtonText;
+          b.style.border = `1px solid ${theme.activeButtonBg}`;
+        } else {
+          b.style.background = theme.buttonBg;
+          b.style.color = theme.buttonText;
+          b.style.border = `1px solid ${theme.buttonBorder}`;
+        }
+      });
+
+      timelineSelect.style.background = theme.selectBg;
+      timelineSelect.style.color = theme.selectText;
+      timelineSelect.style.border = `1px solid ${theme.selectBorder}`;
+      modeSelect.style.background = theme.selectBg;
+      modeSelect.style.color = theme.selectText;
+      modeSelect.style.border = `1px solid ${theme.selectBorder}`;
+
+      if (currentCategory && rawSubmissions.length > 0) {
+        const modeData = recalcForMode(modeSelect.value, timelineSelect.value);
+        renderTableForCategory(modeData, currentCategory);
+        renderWeakTopics(weakContest, "High WA% (Contest)", modeData.contestFriction);
+        renderWeakTopics(weakGlobal, "High WA% (Overall)", modeData.globalFriction);
+      }
+    }
+  }
+
+  const themeObserver = new MutationObserver(() => {
+    updateTheme();
+  });
+
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class', 'style', 'data-theme']
+  });
+  themeObserver.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['class', 'style', 'data-theme']
+  });
+
+  const observeElements = [
+    document.querySelector('.info'),
+    document.querySelector('.roundbox'),
+    document.querySelector('#pageContent'),
+    document.body
+  ].filter(el => el !== null);
+
+  observeElements.forEach(el => {
+    themeObserver.observe(el, {
+      attributes: true,
+      attributeFilter: ['style', 'class']
+    });
+  });
+
+  setInterval(() => {
+    updateTheme();
+  }, 500);
+
+  window.addEventListener('focus', () => {
+    updateTheme();
+  });
 
   function median(arr) {
     if (!arr || arr.length === 0) return null;
