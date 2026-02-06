@@ -5,18 +5,19 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 
 - [Install CF Performance Mirror](https://chromewebstore.google.com/detail/cf-performance-mirror/lpbkkcofbkmghobeeeipbdgohbckcdgj)
 
-![CF Performance Mirror – Installation](./screenshots/installation_page.png)
+![CF Performance Mirror – Overview](./screenshots/full_ui.png)
 
 
 ## Features
 - Average & median solve time per problem index (A–H)
-- Division-wise breakdown (Div1–Div4, Global, Other)
+- Division-wise breakdown (Div1–Div4, Div1+Div2, Other)
+- Time window selector: All time • Last 1/3/6/12/24 months
 - Mode switch: Total • Rated • Unrated
 - High WA% (wrong-attempt percentage) topics for:
-  - Contest submissions (only contests you participated in)
-  - Overall submissions
+  - Contest submissions (only contests you participated in, within contest time window)
+  - Overall submissions (all Codeforces practice + contest submissions)
 - Shows unsolved problem indices in the table
-- Minimal UI that matches Codeforces styling; injected into profile pages
+- Automatically adapts to Codeforces light/dark themes with compact, native-looking UI
 
 ## Quick install (Load unpacked)
 1. Clone or download this repository to a local folder.
@@ -37,9 +38,15 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 
 ## Screenshots 🖼️
 
-![CF Performance Mirror – Contest-wise Timing](./screenshots/contest_wise_timing.png)
+![CF Performance Mirror – Full UI](./screenshots/full_ui.png)
 
-![CF Performance Mirror – Contest-wise & Global WA Analysis](./screenshots/contest_wise_and_global_wa_analysis.png)
+![CF Performance Mirror – Contest time breakdown](./screenshots/contest_time.png)
+
+![CF Performance Mirror – Contest type / mode switch](./screenshots/contest_type.png)
+
+![CF Performance Mirror – Timeline selector](./screenshots/contest_according_to_timeslot.png)
+
+![CF Performance Mirror – Contest-wise & global WA friction](./screenshots/wa_friction.png)
 
 ## Motivation / Philosophy
 - Built for competitive programmers who want a private, quick snapshot of where they struggle and how long they take on problems.
