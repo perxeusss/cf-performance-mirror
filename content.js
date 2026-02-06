@@ -14,14 +14,15 @@
   const DEFAULT_INDICES = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
   function detectDarkMode() {
-    const hasDarkClass = document.documentElement.classList.contains('dark') || 
-                        document.documentElement.classList.contains('dark-mode') ||
-                        document.body.classList.contains('dark') ||
-                        document.body.classList.contains('dark-mode');
-    
+    const hasDarkClass = document.documentElement.classList.contains('dark') ||
+      document.documentElement.classList.contains('dark-mode') ||
+      document.body.classList.contains('dark') ||
+      document.body.classList.contains('dark-mode');
+
     if (hasDarkClass) return true;
 
     const containers = [
+      document.querySelector('.info'),
       document.querySelector('.datatable'),
       document.querySelector('.roundbox'),
       document.querySelector('#pageContent'),
@@ -41,11 +42,19 @@
         }
       }
     }
-    
+
     return false;
   }
 
   function getBoxBackground() {
+    const infoBox = document.querySelector('.info');
+    if (infoBox) {
+      const bg = window.getComputedStyle(infoBox).backgroundColor;
+      if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+        return bg;
+      }
+    }
+
     const roundbox = document.querySelector('.roundbox');
     if (roundbox) {
       const bg = window.getComputedStyle(roundbox).backgroundColor;
@@ -53,7 +62,7 @@
         return bg;
       }
     }
-    
+
     const pageContent = document.querySelector('#pageContent');
     if (pageContent) {
       const bg = window.getComputedStyle(pageContent).backgroundColor;
@@ -61,16 +70,25 @@
         return bg;
       }
     }
-    
+
     const bodyBg = window.getComputedStyle(document.body).backgroundColor;
     if (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') {
       return bodyBg;
     }
-    
-    return isDark ? 'rgb(40, 40, 40)' : 'rgb(255, 255, 255)';
+
+    const isDarkFallback = detectDarkMode();
+    return isDarkFallback ? '#1a1a1a' : '#ffffff';
   }
 
   function getBoxBorderColor() {
+    const infoBox = document.querySelector('.info');
+    if (infoBox) {
+      const borderColor = window.getComputedStyle(infoBox).borderColor;
+      if (borderColor && borderColor !== 'rgba(0, 0, 0, 0)' && borderColor !== 'transparent') {
+        return borderColor;
+      }
+    }
+
     const roundbox = document.querySelector('.roundbox');
     if (roundbox) {
       const borderColor = window.getComputedStyle(roundbox).borderColor;
@@ -78,35 +96,39 @@
         return borderColor;
       }
     }
-    
-    return isDark ? '#555' : '#ddd';
+
+    const isDarkFallback = detectDarkMode();
+    return isDarkFallback ? '#555' : '#ddd';
+  }
+  function createTheme() {
+    const isDark = detectDarkMode();
+    const boxBg = getBoxBackground();
+    const boxBorderColor = getBoxBorderColor();
+
+    return {
+      bg: boxBg,
+      text: isDark ? '#e8e8e8' : '#0b1220',
+      border: boxBorderColor,
+      borderLight: isDark ? '#444' : '#eee',
+      borderLighter: isDark ? '#333' : '#f0f0f0',
+      muted: isDark ? '#aaa' : '#666',
+      headingText: isDark ? '#ddd' : '#222',
+      buttonBg: isDark ? '#3a3a3a' : '#f5f5f5',
+      buttonText: isDark ? '#ddd' : '#333',
+      buttonBorder: isDark ? '#555' : '#ccc',
+      activeButtonBg: '#1652d6',
+      activeButtonText: '#fff',
+      tableHeaderText: isDark ? '#ccc' : '#666',
+      tableCellText: isDark ? '#ddd' : '#444',
+      emptyText: isDark ? '#777' : '#999',
+      selectBg: isDark ? '#2a2a2a' : '#fff',
+      selectText: isDark ? '#ddd' : '#333',
+      selectBorder: isDark ? '#555' : '#ccc',
+      weakTopicName: isDark ? '#ccc' : '#444'
+    };
   }
 
-  const isDark = detectDarkMode();
-  const boxBg = getBoxBackground();
-  const boxBorderColor = getBoxBorderColor();
-  
-  const theme = {
-    bg: boxBg,
-    text: isDark ? '#e8e8e8' : '#0b1220',
-    border: boxBorderColor,
-    borderLight: isDark ? '#444' : '#eee',
-    borderLighter: isDark ? '#333' : '#f0f0f0',
-    muted: isDark ? '#aaa' : '#666',
-    headingText: isDark ? '#ddd' : '#222',
-    buttonBg: isDark ? '#3a3a3a' : '#f5f5f5',
-    buttonText: isDark ? '#ddd' : '#333',
-    buttonBorder: isDark ? '#555' : '#ccc',
-    activeButtonBg: '#1652d6',
-    activeButtonText: '#fff',
-    tableHeaderText: isDark ? '#ccc' : '#666',
-    tableCellText: isDark ? '#ddd' : '#444',
-    emptyText: isDark ? '#777' : '#999',
-    selectBg: isDark ? '#2a2a2a' : '#fff',
-    selectText: isDark ? '#ddd' : '#333',
-    selectBorder: isDark ? '#555' : '#ccc',
-    weakTopicName: isDark ? '#ccc' : '#444'
-  };
+  let theme = createTheme();
 
   const card = document.createElement("div");
   card.id = "cfpm-compact";
@@ -219,7 +241,7 @@
       const w = Math.round(last.getBoundingClientRect().width);
       card.style.width = (w > 220 ? (w + "px") : "880px");
       last.insertAdjacentElement("afterend", card);
-      
+
       if (window.ResizeObserver) {
         const resizeObserver = new ResizeObserver(entries => {
           for (let entry of entries) {
@@ -231,7 +253,7 @@
         });
         resizeObserver.observe(last);
       }
-      
+
       return true;
     }
     const main = document.querySelector("#pageContent, #mainContent, .mainContent, .content");
@@ -239,7 +261,7 @@
       const w = Math.round(main.getBoundingClientRect().width);
       card.style.width = (w > 220 ? (w + "px") : "880px");
       main.appendChild(card);
-      
+
       if (window.ResizeObserver) {
         const resizeObserver = new ResizeObserver(entries => {
           for (let entry of entries) {
@@ -251,7 +273,7 @@
         });
         resizeObserver.observe(main);
       }
-      
+
       return true;
     }
     document.body.appendChild(card);
@@ -259,6 +281,13 @@
     return true;
   }
   insertCard();
+
+  setTimeout(() => {
+    theme = createTheme();
+    card.style.background = theme.bg;
+    card.style.border = `1px solid ${theme.border}`;
+    card.style.color = theme.text;
+  }, 100);
 
   function median(arr) {
     if (!arr || arr.length === 0) return null;
