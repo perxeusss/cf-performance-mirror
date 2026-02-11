@@ -40,9 +40,9 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 
 ## Screenshots 🖼️
 
-![CF Performance Mirror – Contest type / mode switch](./screenshots/contest_type_highlighted.png)
+![CF Performance Mirror – Contest type / mode switch](./screenshots/highlighted_contest_type%20.png)
 
-![CF Performance Mirror – Timeline selector & WA friction](./screenshots/contest_timeslot_highlighted.png)
+![CF Performance Mirror – Timeline selector & WA friction](./screenshots/highlighted_time_slot%20.png)
 
 ## Motivation / Philosophy
 - Built for competitive programmers who want a private, quick snapshot of where they struggle and how long they take on problems.

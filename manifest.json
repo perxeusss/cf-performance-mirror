@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "CF Performance Mirror",
   "description": "Analyze Codeforces profiles with contest-wise solve time, WA% friction, and time-range filters — compact, non-intrusive.",
-  "version": "1.0.13",
+  "version": "1.0.10",
   "short_name": "CF Mirror",
   "icons": {
     "16": "icons/icon16.png",
