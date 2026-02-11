@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "CF Performance Mirror",
   "description": "Analyze Codeforces profiles with contest-wise solve time, WA% friction, and time-range filters — compact, non-intrusive.",
-  "version": "1.0.8",
+  "version": "1.0.13",
   "short_name": "CF Mirror",
   "icons": {
     "16": "icons/icon16.png",
@@ -27,7 +27,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "cfmirror@perxeusss",
-      "strict_min_version": "140.0"
+      "strict_min_version": "109.0"
     }
   }
 }
