@@ -594,7 +594,6 @@
     let cutoffTime = 0;
     let endTime = now;
 
-    // Handle custom date range
     if (typeof timelineMonths === 'object' && timelineMonths.type === 'custom') {
       if (timelineMonths.start && timelineMonths.end) {
         cutoffTime = new Date(timelineMonths.start).getTime() / 1000;

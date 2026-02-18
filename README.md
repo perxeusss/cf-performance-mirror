@@ -3,7 +3,11 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 
 ## Install from Chrome Web Store
 
-- [Install CF Performance Mirror](https://chromewebstore.google.com/detail/cf-performance-mirror/lpbkkcofbkmghobeeeipbdgohbckcdgj)
+- [Install CF Performance Mirror (Chrome)](https://chromewebstore.google.com/detail/cf-performance-mirror/lpbkkcofbkmghobeeeipbdgohbckcdgj)
+
+## Install from Firefox Add-ons
+
+- [Install CF Performance Mirror (Firefox)](https://addons.mozilla.org/en-US/firefox/addon/cf-performance-mirror/)
 
 ![CF Performance Mirror – Overview](./screenshots/full_ui.png)
 
@@ -40,9 +44,11 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 
 ## Screenshots 🖼️
 
-![CF Performance Mirror – Contest type / mode switch](./screenshots/highlighted_contest_type%20.png)
+![CF Performance Mirror – Contest type / mode switch](./screenshots/contest_filter_highlighted.png)
 
-![CF Performance Mirror – Timeline selector & WA friction](./screenshots/highlighted_time_slot%20.png)
+![CF Performance Mirror – Timeline selector & WA friction](./screenshots/time_slot_filter_highlighted.png)
+
+![CF Performance Mirror – Custom time range](./screenshots/custom_time_range.png)
 
 ## Motivation / Philosophy
 - Built for competitive programmers who want a private, quick snapshot of where they struggle and how long they take on problems.
