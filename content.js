@@ -1518,18 +1518,23 @@
         const attSpan = document.createElement("span");
         attSpan.style.cssText = `font-size:12px;color:${theme.muted};white-space:nowrap;flex-shrink:0;`;
         const unsolved = unsolvedCount(t);
-        if (localHideAC) {
-          if (unsolved > 0) {
-            attSpan.innerHTML = `${t.attempts} attempts · <span style="color:${theme.waBadgeText};font-weight:600;">${unsolved} unsolved</span>`;
-          } else {
-            attSpan.innerHTML = `${t.attempts} attempts · <span style="color:${theme.solvedBadgeText};font-weight:600;">all AC'd</span>`;
-          }
-        } else {
-          if (unsolved > 0) {
-            attSpan.innerHTML = `${t.attempts} attempts · <span style="color:${theme.waBadgeText};font-weight:600;">${unsolved} unsolved</span>`;
-          } else {
-            attSpan.textContent = `${t.attempts} attempts`;
-          }
+        attSpan.textContent = "";
+        const attText = document.createTextNode(`${t.attempts} attempts`);
+        attSpan.appendChild(attText);
+        if (unsolved > 0) {
+          const sep = document.createTextNode(" · ");
+          const badge = document.createElement("span");
+          badge.style.cssText = `color:${theme.waBadgeText};font-weight:600;`;
+          badge.textContent = `${unsolved} unsolved`;
+          attSpan.appendChild(sep);
+          attSpan.appendChild(badge);
+        } else if (localHideAC) {
+          const sep = document.createTextNode(" · ");
+          const badge = document.createElement("span");
+          badge.style.cssText = `color:${theme.solvedBadgeText};font-weight:600;`;
+          badge.textContent = "all AC'd";
+          attSpan.appendChild(sep);
+          attSpan.appendChild(badge);
         }
 
         const pct = document.createElement("span");
