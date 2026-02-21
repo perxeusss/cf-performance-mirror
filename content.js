@@ -241,7 +241,6 @@
   controlsRow.appendChild(rightControls);
   card.appendChild(controlsRow);
 
-  // ── settings panel ──────────────────────────────────────────────────────────
   const settingsPanel = document.createElement("div");
   settingsPanel.style.cssText = [
     "display:none","flex-direction:row","align-items:flex-end","flex-wrap:nowrap","gap:8px","box-sizing:border-box","width:100%",
@@ -339,7 +338,6 @@
     renderCategory(newSettings.category);
   });
 
-  // ── custom date row ──────────────────────────────────────────────────────────
   const customDateRow = document.createElement("div");
   customDateRow.style.cssText = "display:none;align-items:center;gap:8px;margin-bottom:8px;padding:8px;background:"+theme.bg+";border:1px solid "+theme.border+";border-radius:6px;flex-wrap:wrap;min-height:44px;";
 
@@ -406,7 +404,6 @@
   tableWrap.appendChild(table);
   card.appendChild(tableWrap);
 
-  // ── friction section ─────────────────────────────────────────────────────────
   const frictionSection = document.createElement("div");
   frictionSection.style.cssText = `margin-top:12px;border-top:1px solid ${theme.borderLight};padding-top:10px;`;
 
@@ -434,11 +431,10 @@
   frictionSection.appendChild(frictionScrollBox);
   card.appendChild(frictionSection);
 
-  // ── helpers ──────────────────────────────────────────────────────────────────
   function ratingBucket(rating) {
     if (!rating || isNaN(rating)) return "Unrated";
     const r = Math.floor(rating / 100) * 100;
-    return `${r}–${r + 99}`;
+    return `${r} ${r + 99}`;
   }
 
   function sortRatingBuckets(list) {
