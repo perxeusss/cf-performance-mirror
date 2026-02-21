@@ -17,8 +17,9 @@
   const DEFAULT_MODE      = _saved.mode      || "total";
   const DEFAULT_TIMELINE  = _saved.timeline  || "all";
   const DEFAULT_FRICTION  = _saved.friction  || "topics";
-  const DEFAULT_SORT_MODE = _saved.sortMode  || "wa";
-  const DEFAULT_HIDE_AC   = _saved.hideAC    !== undefined ? _saved.hideAC : false;
+  const DEFAULT_SORT_MODE    = _saved.sortMode    || "wa";
+  const DEFAULT_HIDE_AC      = _saved.hideAC      !== undefined ? _saved.hideAC      : false;
+  const DEFAULT_MIN_ATTEMPTS = _saved.minAttempts !== undefined ? _saved.minAttempts : 1;
   const contestMap = {};
 
   let rawSubmissions = [];
@@ -118,8 +119,9 @@
 
   let theme = createTheme();
   let frictionView   = DEFAULT_FRICTION;
-  let defaultSortMode = DEFAULT_SORT_MODE;
-  let hideAC          = DEFAULT_HIDE_AC;
+  let defaultSortMode  = DEFAULT_SORT_MODE;
+  let hideAC           = DEFAULT_HIDE_AC;
+  let minAttemptsGlobal = DEFAULT_MIN_ATTEMPTS;
 
   const card = document.createElement("div");
   card.id = "cfpm-compact";
@@ -199,7 +201,8 @@
       "padding:6px 12px","border-radius:6px",
       `border:1px solid ${theme.buttonBorder}`,
       `background:${theme.buttonBg}`,`color:${theme.buttonText}`,
-      "cursor:pointer","font-weight:600","font-size:13px","white-space:nowrap","transition:background 0.15s,color 0.15s"
+      "cursor:pointer","font-weight:600","font-size:13px","white-space:nowrap",
+      "transition:background 0.15s,color 0.15s"
     ].join(";");
     b.addEventListener("click", () => {
       frictionView = value;
@@ -211,9 +214,10 @@
 
   const btnTopics = makeFrictionToggleBtn("Topics", "topics");
   const btnRatings = makeFrictionToggleBtn("Ratings", "ratings");
+  const btnProblems = makeFrictionToggleBtn("Problems", "problems");
 
   function updateFrictionToggleBtns() {
-    [btnTopics, btnRatings].forEach(b => {
+    [btnTopics, btnRatings, btnProblems].forEach(b => {
       if (b.dataset.fview === frictionView) {
         b.style.background = theme.activeButtonBg; b.style.color = theme.activeButtonText; b.style.border = `1px solid ${theme.activeButtonBg}`;
       } else {
@@ -279,18 +283,42 @@
     { value: "12", label: "Last Year" },{ value: "24", label: "Last 2 Years" }
   ], DEFAULT_TIMELINE === "custom" ? "all" : DEFAULT_TIMELINE);
   const sModeSel     = makeSettingsSelect(["total","rated","unrated"].map(v => ({ value: v, label: v[0].toUpperCase()+v.slice(1) })), DEFAULT_MODE);
-  const sFrictionSel = makeSettingsSelect([{ value: "topics", label: "Topics" },{ value: "ratings", label: "Ratings" }], DEFAULT_FRICTION);
-  const sSortSel     = makeSettingsSelect([{ value: "wa", label: "WA%" },{ value: "attempts", label: "Attempts" }], DEFAULT_SORT_MODE);
-  const sHideACSel   = makeSettingsSelect([{ value: "false", label: "Show All" },{ value: "true", label: "Hide AC'd" }], String(DEFAULT_HIDE_AC));
+  const sFrictionSel = makeSettingsSelect([{ value: "topics", label: "Topics" },{ value: "ratings", label: "Ratings" },{ value: "problems", label: "Problems" }], DEFAULT_FRICTION);
+
+  function syncSortOptions() {
+    const isProb = sFrictionSel.value === "problems";
+    const cur = sSortSel.value;
+    sSortSel.innerHTML = "";
+    (isProb
+      ? [{ value: "attempts", label: "Errors" }, { value: "rating", label: "Rating" }]
+      : [{ value: "wa", label: "WA%" }, { value: "attempts", label: "Attempts" }]
+    ).forEach(({ value, label }) => {
+      const o = document.createElement("option");
+      o.value = value; o.textContent = label; sSortSel.appendChild(o);
+    });
+    sSortSel.value = sSortSel.querySelector(`option[value="${cur}"]`) ? cur : sSortSel.options[0].value;
+  }
+
+  const sSortSel = makeSettingsSelect(
+    DEFAULT_FRICTION === "problems"
+      ? [{ value: "attempts", label: "Errors" }, { value: "rating", label: "Rating" }]
+      : [{ value: "wa", label: "WA%" }, { value: "attempts", label: "Attempts" }],
+    DEFAULT_SORT_MODE
+  );
+  sFrictionSel.addEventListener("change", syncSortOptions);
+  const sHideACSel      = makeSettingsSelect([{ value: "false", label: "Show All" },{ value: "true", label: "Hide AC'd" }], String(DEFAULT_HIDE_AC));
+  const sMinAttemptsOpts = [1,2,3,5,10].map(n => ({ value: String(n), label: String(n) + "+" }));
+  const sMinAttemptsSel  = makeSettingsSelect(sMinAttemptsOpts, String(DEFAULT_MIN_ATTEMPTS));
 
   const sSelectsRow = document.createElement("div");
   sSelectsRow.style.cssText = "display:flex;flex:1;flex-wrap:nowrap;gap:8px;align-items:flex-end;min-width:0;";
   sSelectsRow.appendChild(makeSettingField("Category", sCatSel));
   sSelectsRow.appendChild(makeSettingField("Timeline", sTimelineSel));
-  sSelectsRow.appendChild(makeSettingField("Contest Type",     sModeSel));
-  sSelectsRow.appendChild(makeSettingField("WA% View",         sFrictionSel));
-  sSelectsRow.appendChild(makeSettingField("Sort By",          sSortSel));
-  sSelectsRow.appendChild(makeSettingField("AC Problems",      sHideACSel));
+  sSelectsRow.appendChild(makeSettingField("Contest Type",  sModeSel));
+  sSelectsRow.appendChild(makeSettingField("View",      sFrictionSel));
+  sSelectsRow.appendChild(makeSettingField("Sort By",       sSortSel));
+  sSelectsRow.appendChild(makeSettingField("AC Problems",   sHideACSel));
+  sSelectsRow.appendChild(makeSettingField("Min WA",        sMinAttemptsSel));
   settingsPanel.appendChild(sSelectsRow);
 
   const sBtnRow = document.createElement("div");
@@ -324,13 +352,14 @@
   });
 
   sSaveBtn.addEventListener("click", () => {
-    const newSettings = { category: sCatSel.value, timeline: sTimelineSel.value, mode: sModeSel.value, friction: sFrictionSel.value, sortMode: sSortSel.value, hideAC: sHideACSel.value === "true" };
+    const newSettings = { category: sCatSel.value, timeline: sTimelineSel.value, mode: sModeSel.value, friction: sFrictionSel.value, sortMode: sSortSel.value, hideAC: sHideACSel.value === "true", minAttempts: parseInt(sMinAttemptsSel.value) || 1 };
     saveSettings(newSettings);
     timelineSelect.value = newSettings.timeline;
     modeSelect.value = newSettings.mode;
-    frictionView    = newSettings.friction;
-    defaultSortMode = newSettings.sortMode;
-    hideAC          = newSettings.hideAC;
+    frictionView       = newSettings.friction;
+    defaultSortMode    = newSettings.sortMode;
+    hideAC             = newSettings.hideAC;
+    minAttemptsGlobal  = newSettings.minAttempts;
     updateFrictionToggleBtns();
     settingsOpen = false; settingsPanel.style.display = "none";
     settingsBtn.style.background = theme.buttonBg; settingsBtn.style.color = theme.buttonText;
@@ -408,18 +437,10 @@
   frictionSection.style.cssText = `margin-top:12px;border-top:1px solid ${theme.borderLight};padding-top:10px;`;
 
   const frictionToggleRow = document.createElement("div");
-  frictionToggleRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;";
-
-  const frictionHeading = document.createElement("span");
-  frictionHeading.style.cssText = `font-weight:600;color:${theme.headingText};font-size:14px;`;
-
-  const frictionBtnGroup = document.createElement("div");
-  frictionBtnGroup.style.cssText = "display:flex;gap:6px;";
-  frictionBtnGroup.appendChild(btnTopics);
-  frictionBtnGroup.appendChild(btnRatings);
-
-  frictionToggleRow.appendChild(frictionHeading);
-  frictionToggleRow.appendChild(frictionBtnGroup);
+  frictionToggleRow.style.cssText = "display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-bottom:8px;";
+  frictionToggleRow.appendChild(btnTopics);
+  frictionToggleRow.appendChild(btnRatings);
+  frictionToggleRow.appendChild(btnProblems);
   frictionSection.appendChild(frictionToggleRow);
 
   const frictionScrollBox = document.createElement("div");
@@ -433,8 +454,7 @@
 
   function ratingBucket(rating) {
     if (!rating || isNaN(rating)) return "Unrated";
-    const r = Math.floor(rating / 100) * 100;
-    return `${r} ${r + 99}`;
+    return String(rating);
   }
 
   function sortRatingBuckets(list) {
@@ -473,7 +493,6 @@
   setTimeout(() => {
     theme = createTheme();
     card.style.background = theme.bg; card.style.border = `1px solid ${theme.border}`; card.style.color = theme.text;
-    frictionHeading.style.color = theme.headingText;
     frictionSection.style.borderTop = `1px solid ${theme.borderLight}`;
     frictionScrollBox.style.border = `1px solid ${theme.borderLight}`;
     info.style.color = theme.muted;
@@ -481,7 +500,7 @@
     modeSelect.style.background = theme.selectBg; modeSelect.style.color = theme.selectText; modeSelect.style.borderColor = theme.selectBorder;
     settingsBtn.style.background = theme.buttonBg; settingsBtn.style.color = theme.buttonText; settingsBtn.style.border = `1px solid ${theme.buttonBorder}`;
     settingsPanel.style.background = theme.bg; settingsPanel.style.border = `1px solid ${theme.border}`;
-    [sCatSel, sTimelineSel, sModeSel, sFrictionSel, sSortSel, sHideACSel].forEach(sel => {
+    [sCatSel, sTimelineSel, sModeSel, sFrictionSel, sSortSel, sHideACSel, sMinAttemptsSel].forEach(sel => {
       sel.style.background = theme.selectBg; sel.style.color = theme.selectText; sel.style.borderColor = theme.selectBorder;
     });
     const colorScheme = detectDarkMode() ? "dark" : "light";
@@ -508,7 +527,6 @@
       card.style.background = theme.bg; card.style.border = `1px solid ${theme.border}`; card.style.color = theme.text;
       info.style.color = theme.muted;
       frictionSection.style.borderTop = `1px solid ${theme.borderLight}`;
-      frictionHeading.style.color = theme.headingText;
       frictionScrollBox.style.border = `1px solid ${theme.borderLight}`;
       Object.keys(categoryButtons).forEach(k => {
         const b = categoryButtons[k];
@@ -530,7 +548,7 @@
       applyDateBtn.style.background = theme.activeButtonBg; applyDateBtn.style.color = theme.activeButtonText; applyDateBtn.style.borderColor = theme.activeButtonBg;
       sSaveBtn.style.background = theme.activeButtonBg; sSaveBtn.style.color = theme.activeButtonText;
 
-      [sCatSel, sTimelineSel, sModeSel, sFrictionSel, sSortSel, sHideACSel].forEach(sel => {
+      [sCatSel, sTimelineSel, sModeSel, sFrictionSel, sSortSel, sHideACSel, sMinAttemptsSel].forEach(sel => {
         sel.style.background = theme.selectBg; sel.style.color = theme.selectText; sel.style.borderColor = theme.selectBorder;
       });
       sCancelBtn.style.background = theme.buttonBg; sCancelBtn.style.color = theme.buttonText; sCancelBtn.style.borderColor = theme.buttonBorder;
@@ -670,19 +688,6 @@
       categoryRatingWAProblems[c] = {};
     });
 
-    const subsByContest = {};
-    filteredSubmissions.forEach(s => {
-      if (!s.problem) return;
-      const cid = s.problem.contestId;
-      if (!participated.has(cid)) return;
-      const contest = contestMap[cid];
-      if (!contest || typeof contest.startTimeSeconds !== "number" || typeof contest.durationSeconds !== "number") return;
-      const start = contest.startTimeSeconds, end = start + contest.durationSeconds, st = s.creationTimeSeconds;
-      if (typeof st !== "number" || st < start || st > end) return;
-      subsByContest[cid] = subsByContest[cid] || [];
-      subsByContest[cid].push(s);
-    });
-
     const unofficialContests = new Set();
     participated.forEach(cid => { if (!ratedContestSet.has(cid)) unofficialContests.add(cid); });
 
@@ -730,33 +735,28 @@
       categoryIndexAttempts[cat][idx] = (categoryIndexAttempts[cat][idx] || 0) + 1;
       categoryIndexTimes[cat][idx] = categoryIndexTimes[cat][idx] || [];
 
+      const problemInfo = {
+        pid, name: s.problem.name || idx, contestId: cid,
+        contestName: contest.name || ("Contest " + cid),
+        index: idx, rating: s.problem.rating || null,
+        tags: tags.slice(),
+        solved: everAC.has(pid),
+        wa: 0, tle: 0, rte: 0, mle: 0, other: 0
+      };
+      if (!categoryTopicWAProblems[cat]) categoryTopicWAProblems[cat] = {};
+      tags.forEach(t => {
+        if (!categoryTopicWAProblems[cat][t]) categoryTopicWAProblems[cat][t] = new Map();
+        if (!categoryTopicWAProblems[cat][t].has(pid)) categoryTopicWAProblems[cat][t].set(pid, { ...problemInfo });
+        categoryTopicWAProblems[cat][t].get(pid).solved = everAC.has(pid);
+      });
+      if (!categoryRatingWAProblems[cat]) categoryRatingWAProblems[cat] = {};
+      if (!categoryRatingWAProblems[cat][bucket]) categoryRatingWAProblems[cat][bucket] = new Map();
+      if (!categoryRatingWAProblems[cat][bucket].has(pid)) categoryRatingWAProblems[cat][bucket].set(pid, { ...problemInfo });
+      categoryRatingWAProblems[cat][bucket].get(pid).solved = everAC.has(pid);
+
       if (s.verdict !== "OK") {
         tags.forEach(t => { categoryTopicAttempts[cat][t] = (categoryTopicAttempts[cat][t] || 0) + 1; });
         categoryRatingAttempts[cat][bucket] = (categoryRatingAttempts[cat][bucket] || 0) + 1;
-        const vtype = s.verdict === "WRONG_ANSWER" ? "wa"
-                    : s.verdict === "TIME_LIMIT_EXCEEDED" ? "tle"
-                    : s.verdict === "RUNTIME_ERROR" ? "rte"
-                    : s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle"
-                    : "other";
-        const problemInfo = {
-          pid, name: s.problem.name || idx, contestId: cid,
-          contestName: contest.name || ("Contest " + cid),
-          index: idx, rating: s.problem.rating || null,
-          solved: everAC.has(pid),
-          wa: 0, tle: 0, rte: 0, mle: 0, other: 0
-        };
-        if (!categoryTopicWAProblems[cat]) categoryTopicWAProblems[cat] = {};
-        tags.forEach(t => {
-          if (!categoryTopicWAProblems[cat][t]) categoryTopicWAProblems[cat][t] = new Map();
-          if (!categoryTopicWAProblems[cat][t].has(pid)) categoryTopicWAProblems[cat][t].set(pid, { ...problemInfo });
-          categoryTopicWAProblems[cat][t].get(pid)[vtype]++;
-          categoryTopicWAProblems[cat][t].get(pid).solved = everAC.has(pid);
-        });
-        if (!categoryRatingWAProblems[cat]) categoryRatingWAProblems[cat] = {};
-        if (!categoryRatingWAProblems[cat][bucket]) categoryRatingWAProblems[cat][bucket] = new Map();
-        if (!categoryRatingWAProblems[cat][bucket].has(pid)) categoryRatingWAProblems[cat][bucket].set(pid, { ...problemInfo });
-        categoryRatingWAProblems[cat][bucket].get(pid)[vtype]++;
-        categoryRatingWAProblems[cat][bucket].get(pid).solved = everAC.has(pid);
       }
 
       if (s.verdict !== "OK") return;
@@ -770,6 +770,33 @@
       const timeMin = (st - start) / 60;
       const maxAllowed = Math.max(1, Math.round(contest.durationSeconds / 60));
       if (timeMin >= 0 && timeMin <= maxAllowed) categoryIndexTimes[cat][idx].push(timeMin);
+    });
+
+    rawSubmissions.forEach(s => {
+      if (!s.problem || s.verdict === "OK") return;
+      const cid = s.problem.contestId;
+      if (!participated.has(cid)) return;
+      const idx    = s.problem.index;
+      const pid    = cid + "-" + idx;
+      const tags   = s.problem.tags || [];
+      const bucket = ratingBucket(s.problem.rating);
+      const vtype  = s.verdict === "WRONG_ANSWER"          ? "wa"
+                   : s.verdict === "TIME_LIMIT_EXCEEDED"   ? "tle"
+                   : s.verdict === "RUNTIME_ERROR"         ? "rte"
+                   : s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle"
+                   : "other";
+
+      let cat = classifyContest(contestMap[cid]);
+      if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contestMap[cid], unofficialContests.has(cid));
+      if (!categoryTopicWAProblems[cat]) cat = "Other";
+      if (!categoryTopicWAProblems[cat]) return;
+
+      tags.forEach(t => {
+        if (categoryTopicWAProblems[cat][t] && categoryTopicWAProblems[cat][t].has(pid))
+          categoryTopicWAProblems[cat][t].get(pid)[vtype]++;
+      });
+      if (categoryRatingWAProblems[cat]?.[bucket]?.has(pid))
+        categoryRatingWAProblems[cat][bucket].get(pid)[vtype]++;
     });
 
     const globalAttempts = {}, globalSolved = {};
@@ -787,36 +814,53 @@
       const pid = cid + "-" + idx;
       const contestName = contest.name || ("Contest " + cid);
 
+      const gProblemInfo = {
+        pid, name: s.problem.name || idx, contestId: cid,
+        contestName, index: idx,
+        rating: s.problem.rating || null,
+        tags: tags.slice(),
+        solved: everAC.has(pid),
+        wa: 0, tle: 0, rte: 0, mle: 0, other: 0
+      };
+      tags.forEach(t => {
+        if (!globalTopicWAProblems[t]) globalTopicWAProblems[t] = new Map();
+        if (!globalTopicWAProblems[t].has(pid)) globalTopicWAProblems[t].set(pid, { ...gProblemInfo });
+        globalTopicWAProblems[t].get(pid).solved = everAC.has(pid);
+      });
+      if (!globalRatingWAProblems[bucket]) globalRatingWAProblems[bucket] = new Map();
+      if (!globalRatingWAProblems[bucket].has(pid)) globalRatingWAProblems[bucket].set(pid, { ...gProblemInfo });
+      globalRatingWAProblems[bucket].get(pid).solved = everAC.has(pid);
+
       if (s.verdict !== "OK") {
         tags.forEach(t => { globalAttempts[t] = (globalAttempts[t] || 0) + 1; });
         globalRatingAttempts[bucket] = (globalRatingAttempts[bucket] || 0) + 1;
-        const vtype = s.verdict === "WRONG_ANSWER" ? "wa"
-                    : s.verdict === "TIME_LIMIT_EXCEEDED" ? "tle"
-                    : s.verdict === "RUNTIME_ERROR" ? "rte"
-                    : s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle"
-                    : "other";
-        const problemInfo = {
-          pid, name: s.problem.name || idx, contestId: cid,
-          contestName, index: idx,
-          rating: s.problem.rating || null,
-          solved: everAC.has(pid),
-          wa: 0, tle: 0, rte: 0, mle: 0, other: 0
-        };
-        tags.forEach(t => {
-          if (!globalTopicWAProblems[t]) globalTopicWAProblems[t] = new Map();
-          if (!globalTopicWAProblems[t].has(pid)) globalTopicWAProblems[t].set(pid, { ...problemInfo });
-          globalTopicWAProblems[t].get(pid)[vtype]++;
-          globalTopicWAProblems[t].get(pid).solved = everAC.has(pid);
-        });
-        if (!globalRatingWAProblems[bucket]) globalRatingWAProblems[bucket] = new Map();
-        if (!globalRatingWAProblems[bucket].has(pid)) globalRatingWAProblems[bucket].set(pid, { ...problemInfo });
-        globalRatingWAProblems[bucket].get(pid)[vtype]++;
-        globalRatingWAProblems[bucket].get(pid).solved = everAC.has(pid);
       }
 
       if (s.verdict !== "OK") return;
       tags.forEach(t => { globalSolved[t] = (globalSolved[t] || 0) + 1; });
       globalRatingSolved[bucket] = (globalRatingSolved[bucket] || 0) + 1;
+    });
+
+    rawSubmissions.forEach(s => {
+      if (!s.problem || s.verdict === "OK") return;
+      const cid = s.problem.contestId;
+      if (!participated.has(cid)) return;
+      const idx    = s.problem.index;
+      const pid    = cid + "-" + idx;
+      const tags   = s.problem.tags || [];
+      const bucket = ratingBucket(s.problem.rating);
+      const vtype  = s.verdict === "WRONG_ANSWER"          ? "wa"
+                   : s.verdict === "TIME_LIMIT_EXCEEDED"   ? "tle"
+                   : s.verdict === "RUNTIME_ERROR"         ? "rte"
+                   : s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle"
+                   : "other";
+
+      tags.forEach(t => {
+        if (globalTopicWAProblems[t] && globalTopicWAProblems[t].has(pid))
+          globalTopicWAProblems[t].get(pid)[vtype]++;
+      });
+      if (globalRatingWAProblems[bucket]?.has(pid))
+        globalRatingWAProblems[bucket].get(pid)[vtype]++;
     });
 
     const contestFriction = [];
@@ -825,7 +869,7 @@
         const a = categoryTopicAttempts[categoryFilter][t] || 0;
         const s = categoryTopicSolved[categoryFilter][t] || 0;
         const waRatio = (a + s) > 0 ? Math.round((a / (a + s)) * 100) : 0;
-        if (a >= 3) contestFriction.push({
+        if (a >= 1) contestFriction.push({
           topic: t, waRatio, attempts: a,
           waProblems: categoryTopicWAProblems[categoryFilter] && categoryTopicWAProblems[categoryFilter][t]
             ? Array.from(categoryTopicWAProblems[categoryFilter][t].values()).sort((x, y) => totalErrors(y) - totalErrors(x))
@@ -839,7 +883,7 @@
     Object.keys(globalAttempts).forEach(t => {
       const a = globalAttempts[t] || 0, s = globalSolved[t] || 0;
       const waRatio = (a + s) > 0 ? Math.round((a / (a + s)) * 100) : 0;
-      if (a >= 5) globalFriction.push({
+      if (a >= 1) globalFriction.push({
         topic: t, waRatio, attempts: a,
         waProblems: globalTopicWAProblems[t]
           ? Array.from(globalTopicWAProblems[t].values()).sort((x, y) => totalErrors(y) - totalErrors(x))
@@ -875,16 +919,40 @@
       });
     });
 
+    const categoryRawProblems = {};
+    CATEGORIES.forEach(c => {
+      const seen = new Map();
+      if (categoryRatingWAProblems[c]) {
+        Object.values(categoryRatingWAProblems[c]).forEach(map => {
+          map.forEach((p, pid) => {
+            if (!seen.has(pid) && totalErrors(p) > 0) seen.set(pid, p);
+          });
+        });
+      }
+      categoryRawProblems[c] = Array.from(seen.values());
+    });
+
+    const globalRawProblems = (() => {
+      const seen = new Map();
+      Object.values(globalRatingWAProblems).forEach(map => {
+        map.forEach((p, pid) => {
+          if (!seen.has(pid) && totalErrors(p) > 0) seen.set(pid, p);
+        });
+      });
+      return Array.from(seen.values());
+    })();
+
     return {
       categoryIndexTimes, categoryIndexAttempts, categoryIndexSolved,
       contestFriction, globalFriction,
       contestRatingFriction, globalRatingFriction,
+      categoryRawProblems, globalRawProblems,
       participatedCount: participated.size,
       categoryContestCount: Object.fromEntries(Object.entries(categoryContestCount).map(([cat, set]) => [cat, set.size]))
     };
   }
 
-  function makeWAProblemDropdown(waProblems, shouldHideAC) {
+  function makeWAProblemDropdown(waProblems, shouldHideAC, minAttempts) {
     const dropdown = document.createElement("div");
     dropdown.style.cssText = [
       `background:${theme.dropdownBg}`,
@@ -908,6 +976,7 @@
     }
 
     const sorted = (waProblems || [])
+      .filter(p => totalErrors(p) >= minAttempts)
       .filter(p => !shouldHideAC || !p.solved)
       .slice().sort((a, b) => totalErrors(b) - totalErrors(a));
 
@@ -944,6 +1013,24 @@
       link.onmouseleave = () => link.style.textDecoration = "none";
       link.addEventListener("click", e => e.stopPropagation());
       row.appendChild(link);
+
+      if (p.tags && p.tags.length > 1) {
+        const tagsWrap = document.createElement("span");
+        tagsWrap.style.cssText = "display:flex;gap:3px;flex-wrap:nowrap;overflow:hidden;flex-shrink:1;min-width:0;";
+        const isDarkNow = detectDarkMode();
+        p.tags.forEach(tag => {
+          const chip = document.createElement("span");
+          chip.textContent = tag;
+          chip.style.cssText = [
+            `background:${isDarkNow ? "#2a3a4a" : "#e8f0fe"}`,
+            `color:${isDarkNow ? "#8ab4f8" : "#1a56c4"}`,
+            "font-size:10px","border-radius:3px","padding:1px 5px",
+            "white-space:nowrap","flex-shrink:0"
+          ].join(";");
+          tagsWrap.appendChild(chip);
+        });
+        row.appendChild(tagsWrap);
+      }
 
       const contestSpan = document.createElement("span");
       contestSpan.style.cssText = `color:${theme.muted};font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;flex-shrink:1;`;
@@ -1014,16 +1101,16 @@
     if (frictionView === "topics") {
       contestList = modeData.contestFriction || [];
       globalList  = modeData.globalFriction  || [];
-      frictionHeading.textContent = "Topic Wise";
-    } else {
+    } else if (frictionView === "ratings") {
       contestList = sortRatingBuckets(modeData.contestRatingFriction || []);
       globalList  = sortRatingBuckets(modeData.globalRatingFriction  || []);
-      frictionHeading.textContent = "Rating Wise";
+    } else {
     }
 
-    let activeTab  = "category";
-    let sortMode   = defaultSortMode;
-    let localHideAC = hideAC;
+    let activeTab        = "category";
+    let sortMode         = defaultSortMode;
+    let localHideAC      = hideAC;
+    let localMinAttempts = minAttemptsGlobal;
 
     function waColor(r) {
       if (r < 40) return "#27ae60";
@@ -1039,7 +1126,16 @@
     }
 
     function unsolvedCount(item) {
-      return (item.waProblems || []).filter(p => !p.solved).length;
+      return (item.waProblems || [])
+        .filter(p => totalErrors(p) >= localMinAttempts && !p.solved)
+        .length;
+    }
+
+    function hasProblematicProblem(item) {
+      return (item.waProblems || []).some(p =>
+        totalErrors(p) >= localMinAttempts &&
+        (!localHideAC || !p.solved)
+      );
     }
 
     const topBar = document.createElement("div");
@@ -1055,10 +1151,8 @@
     function makeTab(label, count, key) {
       const t = document.createElement("button");
       t.dataset.key = key;
-
       const labelSpan = document.createElement("span");
       labelSpan.textContent = label;
-
       const badge = document.createElement("span");
       badge.textContent = count;
       badge.style.cssText = [
@@ -1066,7 +1160,6 @@
         "border-radius:10px","padding:1px 6px",
         `background:${theme.borderLight}`,`color:${theme.muted}`
       ].join(";");
-
       t.appendChild(labelSpan);
       t.appendChild(badge);
       t.style.cssText = [
@@ -1081,10 +1174,41 @@
       return { el: t, badge };
     }
 
-    const { el: tabCatEl } = makeTab(cat, contestList.length, "category");
-    const { el: tabOverallEl } = makeTab("Overall", globalList.length, "overall");
+    function filteredCount(items) {
+      return items.filter(x => hasProblematicProblem(x)).length;
+    }
+
+    function filteredProblemCount(problems) {
+      return problems.filter(p =>
+        totalErrors(p) >= localMinAttempts && (!localHideAC || !p.solved)
+      ).length;
+    }
+
+    const catProblemCount     = filteredProblemCount(modeData.categoryRawProblems?.[cat] || []);
+    const overallProblemCount = filteredProblemCount(modeData.globalRawProblems || []);
+
+    const { el: tabCatEl, badge: tabCatBadge } = makeTab(
+      cat,
+      frictionView === "problems" ? catProblemCount : filteredCount(contestList),
+      "category"
+    );
+    const { el: tabOverallEl, badge: tabOverallBadge } = makeTab(
+      "Overall",
+      frictionView === "problems" ? overallProblemCount : filteredCount(globalList),
+      "overall"
+    );
     tabsWrap.appendChild(tabCatEl);
     tabsWrap.appendChild(tabOverallEl);
+
+    function updateTabBadges() {
+      if (frictionView === "problems") {
+        tabCatBadge.textContent     = filteredProblemCount(modeData.categoryRawProblems?.[cat] || []);
+        tabOverallBadge.textContent = filteredProblemCount(modeData.globalRawProblems || []);
+      } else {
+        tabCatBadge.textContent     = filteredCount(contestList);
+        tabOverallBadge.textContent = filteredCount(globalList);
+      }
+    }
 
     function updateTabStyles() {
       [tabCatEl, tabOverallEl].forEach(t => {
@@ -1116,15 +1240,19 @@
       return b;
     }
 
-    const btnSortWA  = makeSortBtn("WA%",      "wa");
-    const btnSortAtt = makeSortBtn("Attempts", "attempts");
+    const isProblemsView = frictionView === "problems";
+    const btnSortWA  = makeSortBtn(isProblemsView ? "Errors"   : "WA%",      isProblemsView ? "attempts" : "wa");
+    const btnSortAtt = makeSortBtn(isProblemsView ? "Rating"   : "Attempts", isProblemsView ? "rating"   : "attempts");
     sortToggle.appendChild(btnSortWA);
     sortToggle.appendChild(btnSortAtt);
 
     function updateSortStyles() {
       [btnSortWA, btnSortAtt].forEach(b => {
-        const active = (b.textContent === "WA%" && sortMode === "wa") ||
-                       (b.textContent === "Attempts" && sortMode === "attempts");
+        const active = isProblemsView
+          ? (b.textContent === "Errors"  && sortMode === "attempts") ||
+            (b.textContent === "Rating"  && sortMode === "rating")
+          : (b.textContent === "WA%"     && sortMode === "wa") ||
+            (b.textContent === "Attempts"&& sortMode === "attempts");
         b.style.background = active ? theme.activeButtonBg : theme.buttonBg;
         b.style.color      = active ? theme.activeButtonText : theme.buttonText;
       });
@@ -1140,9 +1268,9 @@
     ].join(";");
 
     function updateHideACBtn() {
-      hideACBtn.textContent  = localHideAC ? "Show AC'd" : "Hide AC'd";
-      hideACBtn.style.background = localHideAC ? theme.activeButtonBg : theme.buttonBg;
-      hideACBtn.style.color      = localHideAC ? theme.activeButtonText : theme.buttonText;
+      hideACBtn.textContent   = localHideAC ? "Show AC'd" : "Hide AC'd";
+      hideACBtn.style.background  = localHideAC ? theme.activeButtonBg : theme.buttonBg;
+      hideACBtn.style.color       = localHideAC ? theme.activeButtonText : theme.buttonText;
       hideACBtn.style.borderColor = localHideAC ? theme.activeButtonBg : theme.buttonBorder;
     }
     updateHideACBtn();
@@ -1151,10 +1279,193 @@
       localHideAC = !localHideAC;
       hideAC = localHideAC;
       updateHideACBtn();
+      updateTabBadges();
       renderTabContent();
     });
 
+    const minWAWrap = document.createElement("div");
+    minWAWrap.style.cssText = "display:flex;align-items:center;gap:4px;flex-shrink:0;";
+    const minWALabel = document.createElement("span");
+    minWALabel.textContent = "Min WA:";
+    minWALabel.style.cssText = `font-size:12px;font-weight:600;color:${theme.muted};white-space:nowrap;`;
+    const minWAInput = document.createElement("input");
+    minWAInput.type = "number"; minWAInput.min = "1"; minWAInput.max = "99";
+    minWAInput.value = String(localMinAttempts);
+    minWAInput.style.cssText = [
+      "width:44px","padding:4px 6px","border-radius:5px",
+      `border:1px solid ${theme.inputBorder}`,
+      `background:${theme.inputBg}`,`color:${theme.inputText}`,
+      "font-size:12px","font-weight:600","text-align:center","-moz-appearance:textfield"
+    ].join(";");
+    minWAInput.addEventListener("input", () => {
+      const v = parseInt(minWAInput.value);
+      if (v >= 1) {
+        localMinAttempts = v; minAttemptsGlobal = v;
+        updateTabBadges(); renderTabContent();
+      }
+    });
+    minWAWrap.appendChild(minWALabel);
+    minWAWrap.appendChild(minWAInput);
+
+    if (frictionView === "problems") {
+      rightBtns.appendChild(sortToggle);
+      rightBtns.appendChild(minWAWrap);
+      rightBtns.appendChild(hideACBtn);
+
+      topBar.appendChild(tabsWrap);
+      topBar.appendChild(rightBtns);
+
+      const listArea = document.createElement("div");
+      listArea.style.cssText = "flex:1;overflow-y:auto;";
+
+      function getFlatProblems() {
+        const src = activeTab === "category"
+          ? (modeData.categoryRawProblems?.[cat] || [])
+          : (modeData.globalRawProblems || []);
+        let list = src.filter(p =>
+          totalErrors(p) >= localMinAttempts && (!localHideAC || !p.solved)
+        );
+        if (sortMode === "rating") {
+          list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        } else {
+          list.sort((a, b) => totalErrors(b) - totalErrors(a));
+        }
+        return list;
+      }
+
+      function renderFlatList(problems) {
+        listArea.innerHTML = "";
+        if (!problems.length) {
+          const empty = document.createElement("div");
+          empty.style.cssText = `padding:16px 12px;color:${theme.emptyText};font-style:italic;font-size:13px;text-align:center;`;
+          empty.textContent = "No problems";
+          listArea.appendChild(empty);
+          return;
+        }
+
+        const isDark = detectDarkMode();
+        const tleBg  = isDark ? "#2a2000" : "#fff8e1"; const tleFg = isDark ? "#ffd54f" : "#e65100";
+        const rteBg  = isDark ? "#1a1a2e" : "#ede7f6"; const rteFg = isDark ? "#9fa8da" : "#4527a0";
+        const mleBg  = isDark ? "#002828" : "#e0f2f1"; const mleFg = isDark ? "#4db6ac" : "#00695c";
+        const errBg  = isDark ? "#2a2a2a" : "#f5f5f5";
+
+        problems.forEach((p, i) => {
+          const row = document.createElement("div");
+          row.style.cssText = [
+            "display:flex","align-items:center","gap:8px",
+            "padding:7px 14px",
+            i > 0 ? `border-top:1px solid ${theme.borderLighter}` : "",
+            "cursor:pointer","transition:background 0.1s"
+          ].join(";");
+          row.onmouseenter = () => row.style.background = theme.problemRowHover;
+          row.onmouseleave = () => row.style.background = "";
+
+          const errCount = totalErrors(p);
+          const maxErr = totalErrors(problems[0]) || 1;
+          const intensity = errCount / maxErr;
+          const barColor = intensity > 0.66 ? "#e74c3c" : intensity > 0.33 ? "#e67e22" : "#27ae60";
+          row.style.borderLeft = `3px solid ${barColor}`;
+
+          const link = document.createElement("a");
+          link.href = `https://codeforces.com/contest/${p.contestId}/problem/${p.index}`;
+          link.target = "_blank"; link.rel = "noopener";
+          link.style.cssText = [
+            `color:${theme.problemLink}`,
+            "text-decoration:none","font-size:12px","font-weight:600",
+            "flex:0 0 auto","max-width:220px","min-width:80px",
+            "overflow:hidden","text-overflow:ellipsis","white-space:nowrap"
+          ].join(";");
+          link.textContent = `${p.index}. ${p.name}`;
+          link.title = p.name;
+          link.onmouseenter = () => link.style.textDecoration = "underline";
+          link.onmouseleave = () => link.style.textDecoration = "none";
+          link.addEventListener("click", e => e.stopPropagation());
+          row.appendChild(link);
+
+          if (p.tags && p.tags.length) {
+            const tagsWrap = document.createElement("span");
+            tagsWrap.style.cssText = "display:flex;gap:3px;flex-wrap:wrap;margin-left:auto;justify-content:flex-end;padding-left:8px;";
+            p.tags.forEach(tag => {
+              const chip = document.createElement("span");
+              chip.textContent = tag;
+              chip.style.cssText = [
+                `background:${isDark ? "#2a3a4a" : "#e8f0fe"}`,
+                `color:${isDark ? "#8ab4f8" : "#1a56c4"}`,
+                "font-size:10px","border-radius:3px","padding:1px 5px",
+                "white-space:nowrap","flex-shrink:0"
+              ].join(";");
+              tagsWrap.appendChild(chip);
+            });
+            row.appendChild(tagsWrap);
+          }
+
+          if (p.rating) {
+            const rb = document.createElement("span");
+            rb.style.cssText = `font-size:11px;color:${theme.muted};white-space:nowrap;flex-shrink:0;`;
+            rb.textContent = "★" + p.rating;
+            row.appendChild(rb);
+          }
+
+          [
+            { key: "wa",    label: "WA",  bg: theme.waBadge,   fg: theme.waBadgeText },
+            { key: "tle",   label: "TLE", bg: tleBg,            fg: tleFg },
+            { key: "rte",   label: "RTE", bg: rteBg,            fg: rteFg },
+            { key: "mle",   label: "MLE", bg: mleBg,            fg: mleFg },
+            { key: "other", label: "ERR", bg: errBg,            fg: theme.muted },
+          ].forEach(({ key, label, bg, fg }) => {
+            const cnt = p[key] || 0;
+            if (!cnt) return;
+            const badge = document.createElement("span");
+            badge.style.cssText = [
+              `background:${bg}`,`color:${fg}`,
+              "font-size:11px","font-weight:700","border-radius:4px","padding:1px 6px",
+              "white-space:nowrap","flex-shrink:0"
+            ].join(";");
+            badge.textContent = `${label} ×${cnt}`;
+            row.appendChild(badge);
+          });
+
+          if (p.solved) {
+            const b = document.createElement("span");
+            b.style.cssText = `background:${theme.solvedBadge};color:${theme.solvedBadgeText};font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;white-space:nowrap;flex-shrink:0;`;
+            b.textContent = "✓ AC'd";
+            row.appendChild(b);
+          } else {
+            const b = document.createElement("span");
+            b.style.cssText = `background:${theme.waBadge};color:${theme.waBadgeText};font-size:11px;border-radius:4px;padding:1px 6px;white-space:nowrap;flex-shrink:0;opacity:0.75;`;
+            b.textContent = "Unsolved";
+            row.appendChild(b);
+          }
+
+          row.addEventListener("click", () => {
+            window.open(`https://codeforces.com/contest/${p.contestId}/problem/${p.index}`, "_blank");
+          });
+          listArea.appendChild(row);
+        });
+      }
+
+      function renderTabContent() {
+        updateTabBadges();
+        renderFlatList(getFlatProblems());
+      }
+
+      renderTabContent();
+
+      frictionScrollBox.style.cssText = [
+        "height:265px","overflow:hidden",
+        `border:1px solid ${theme.borderLight}`,
+        "border-radius:5px","display:flex","flex-direction:column","padding:0"
+      ].join(";");
+      frictionScrollBox.appendChild(topBar);
+      frictionScrollBox.appendChild(listArea);
+
+      const existingFiEl = frictionSection.querySelector(".friction-info");
+      if (existingFiEl) existingFiEl.remove();
+      return;
+    }
+
     rightBtns.appendChild(sortToggle);
+    rightBtns.appendChild(minWAWrap);
     rightBtns.appendChild(hideACBtn);
 
     topBar.appendChild(tabsWrap);
@@ -1247,7 +1558,7 @@
             openDropdown.remove();
             if (openRowEl) { openRowEl.style.background = ""; openRowEl._chevron.style.transform = ""; }
           }
-          const dd = makeWAProblemDropdown(waProblems, localHideAC);
+          const dd = makeWAProblemDropdown(waProblems, localHideAC, localMinAttempts);
           rowWrap.appendChild(dd);
           openDropdown = dd; openRowEl = row;
           row._chevron = chevron;
@@ -1262,7 +1573,8 @@
     function renderTabContent() {
       listArea.innerHTML = "";
       const rawItems = activeTab === "category" ? contestList : globalList;
-      listArea.appendChild(makeList(sortedList(rawItems)));
+      const filtered = rawItems.filter(x => hasProblematicProblem(x));
+      listArea.appendChild(makeList(sortedList(filtered)));
     }
 
     renderTabContent();
