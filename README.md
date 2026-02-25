@@ -1,5 +1,5 @@
 # CF Performance Mirror
-Compact contest analytics for Codeforces profiles — average/median solve times and topic friction, shown directly on your profile page.
+Analyse your Codeforces profile — solve times, WA% by topic and problem, division breakdown, and time-range filters.
 
 ## Install from Chrome Web Store
 
@@ -13,17 +13,20 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 
 
 ## Features
-- Average & median solve time per problem index (A–H)
-- Division-wise breakdown (Div1–Div4, Other)
-  - Div1+Div2 / Global contests are automatically treated as Div1 or Div2 based on your rating history
-- Time window selector: All time • Last 1/3/6/12/24 months
-  - Applies to both contest analytics and global WA% friction
-- Mode switch: Total • Rated • Unrated (based on Codeforces contest rating data)
-- High WA% (wrong-attempt percentage) topics for:
-  - Contest submissions (only contests you participated in, within the selected time window)
-  - Overall submissions (all Codeforces practice + contest submissions, within the same window)
-- Shows unsolved problem indices (A–H) explicitly in the table
-- Automatically adapts to Codeforces light/dark themes and surrounding profile styles, keeping a compact, native-looking UI
+1. Solve Time Analysis — Avg & median solve time per problem index (A–H), broken down by division.
+2. WA% Friction — WA, TLE, RTE, MLE counts by topic or problem. Click any topic to expand problems with direct links and solved/unsolved status.
+3. Division-Aware — Auto-splits into Div1/2/3/4/Other. Combined/Global rounds are assigned based on your rating at contest time.
+4. Two Friction Views — Topics (tag-level, sortable by WA% or attempts) and Problems (flat list, sortable by errors or rating).
+5. Category + Overall Tabs — Division-specific stats plus an Overall tab with a Practice Only toggle.
+6. Time-Range Filters — Last 1/3/6/12/24 months, all time, or custom date range.
+7. Total / Rated / Unrated Toggle — Analyze all, rated-only, or unrated/virtual contests.
+8. Noise Controls — Hide AC'd problems and set a minimum WA threshold to cut low-signal entries.
+9. Persistent Settings — All filters, view mode, and sort order saved across sessions.
+10. On/Off Toggle — Collapse to a slim header bar when not needed. State persists across page loads.
+11. Lightweight & Themed — Inline below the profile box. Auto-matches Codeforces light/dark theme.
+
+## How it works
+Runs entirely client-side on `codeforces.com/profile/<handle>`. Fetches from three public Codeforces APIs (`user.status`, `contest.list`, `user.rating`). No server, no tracking — all computation happens in your browser.
 
 ## Quick install (Load unpacked)
 1. Clone or download this repository to a local folder.
@@ -44,11 +47,11 @@ Compact contest analytics for Codeforces profiles — average/median solve times
 
 ## Screenshots 🖼️
 
-![CF Performance Mirror – Contest type / mode switch](./screenshots/contest_filter_highlighted.png)
+![CF Performance Mirror – Overview](./screenshots/full_ui.png)
 
-![CF Performance Mirror – Timeline selector & WA friction](./screenshots/time_slot_filter_highlighted.png)
+![CF Performance Mirror – Problems view](./screenshots/problem_list.png)
 
-![CF Performance Mirror – Custom time range](./screenshots/custom_time_range.png)
+![CF Performance Mirror – Time filters](./screenshots/time_filter.png)
 
 ## Motivation / Philosophy
 - Built for competitive programmers who want a private, quick snapshot of where they struggle and how long they take on problems.
