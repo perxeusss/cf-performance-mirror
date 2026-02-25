@@ -23,7 +23,7 @@
   let DEFAULT_CUSTOM_START = _saved.customStart || "";
   let DEFAULT_CUSTOM_END   = _saved.customEnd   || "";
 
-  // ── Toggle state (persisted separately so it survives settings resets) ──────
+  // Toggle state (persisted separately so it survives settings resets)
   const TOGGLE_KEY = "cfpm_enabled";
   function loadToggle() {
     try { const v = localStorage.getItem(TOGGLE_KEY); return v === null ? true : v === "true"; } catch(e) { return true; }
@@ -134,7 +134,7 @@
     });
   }
 
-  // ── Inject collapse animation CSS ────────────────────────────────────────────
+  // Inject collapse animation CSS 
   if (!document.getElementById("cfpm-toggle-style")) {
     const s = document.createElement("style");
     s.id = "cfpm-toggle-style";
@@ -190,7 +190,7 @@
     "border-radius:6px", "padding:0", "margin-top:10px", "max-width:920px"
   ].join(";");
 
-  // ── Header bar (always visible) ───────────────────────────────────────────────
+  //  Header bar (always visible)
   const headerBar = document.createElement("div");
   headerBar.style.cssText = [
     "display:flex", "align-items:center", "justify-content:space-between",
@@ -201,7 +201,7 @@
   headerTitle.style.cssText = `font-size:11px;font-weight:700;color:${theme.muted};letter-spacing:0.04em;opacity:0.75;cursor:default;user-select:none;`;
   headerTitle.textContent = "⚡ CF Performance Mirror";
 
-  // ── Toggle button ─────────────────────────────────────────────────────────────
+  // Toggle button 
   const toggleBtn = document.createElement("button");
   toggleBtn.id = "cfpm-toggle-btn";
 
@@ -230,7 +230,7 @@
   }
   applyToggleVisuals();
 
-  // ── Body wrapper (everything that collapses) ───────────────────────────────
+  // Body wrapper (everything that collapses) 
   const body = document.createElement("div");
   body.id = "cfpm-body";
   body.style.cssText = "padding:0 16px 16px 16px;box-sizing:border-box;";
@@ -253,7 +253,7 @@
   headerBar.appendChild(toggleBtn);
   card.appendChild(headerBar);
 
-  // ── Divider between header and body ──────────────────────────────────────────
+  //  Divider between header and body 
   const headerDivider = document.createElement("div");
   headerDivider.id = "cfpm-header-divider";
   headerDivider.style.cssText = `height:1px;background:${theme.borderLight};margin:0;transition:opacity 0.28s;`;
