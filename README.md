@@ -9,7 +9,7 @@ Analyse your Codeforces profile — solve times, WA% by topic and problem, divis
 
 - [Install CF Performance Mirror (Firefox)](https://addons.mozilla.org/en-US/firefox/addon/cf-performance-mirror/)
 
-![CF Performance Mirror – Overview](./screenshots/full_ui.png)
+<!-- ![CF Performance Mirror – Overview](./screenshots/full_ui.png) -->
 
 
 ## Features
