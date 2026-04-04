@@ -16,14 +16,13 @@
   let DEFAULT_CATEGORY     = _saved.category    || "Div4";
   let DEFAULT_MODE         = _saved.mode        || "total";
   let DEFAULT_TIMELINE     = _saved.timeline    || "all";
-  let DEFAULT_FRICTION     = _saved.friction    || "topics";
-  let DEFAULT_SORT_MODE    = _saved.sortMode    || "wa";
+  let DEFAULT_SORT_MODE    = _saved.sortMode    || "errors";
   let DEFAULT_HIDE_AC      = _saved.hideAC      !== undefined ? _saved.hideAC      : false;
   let DEFAULT_MIN_ATTEMPTS = _saved.minAttempts !== undefined ? _saved.minAttempts : 1;
   let DEFAULT_CUSTOM_START = _saved.customStart || "";
   let DEFAULT_CUSTOM_END   = _saved.customEnd   || "";
+  let DEFAULT_TAG_FILTERS  = Array.isArray(_saved.tagFilters) ? _saved.tagFilters : [];
 
-  // Toggle state (persisted separately so it survives settings resets)
   const TOGGLE_KEY = "cfpm_enabled";
   function loadToggle() {
     try { const v = localStorage.getItem(TOGGLE_KEY); return v === null ? true : v === "true"; } catch(e) { return true; }
@@ -88,96 +87,163 @@
     return {
       bg: getBoxBackground(), text: isDark ? '#e8e8e8' : '#0b1220',
       border: getBoxBorderColor(),
-      borderLight: isDark ? '#444' : '#eee', borderLighter: isDark ? '#333' : '#f0f0f0',
-      muted: isDark ? '#aaa' : '#666', headingText: isDark ? '#ddd' : '#222',
-      buttonBg: isDark ? '#3a3a3a' : '#f5f5f5', buttonText: isDark ? '#ddd' : '#333',
-      buttonBorder: isDark ? '#555' : '#ccc',
-      activeButtonBg: '#1652d6', activeButtonText: '#fff',
-      tableHeaderText: isDark ? '#ccc' : '#666', tableCellText: isDark ? '#ddd' : '#444',
-      emptyText: isDark ? '#777' : '#999',
-      selectBg: isDark ? '#2a2a2a' : '#fff', selectText: isDark ? '#ddd' : '#333',
-      selectBorder: isDark ? '#555' : '#ccc',
-      weakTopicName: isDark ? '#ccc' : '#444',
-      inputBg: isDark ? '#2a2a2a' : '#fff', inputText: isDark ? '#ddd' : '#333',
-      inputBorder: isDark ? '#555' : '#ccc',
-      dropdownBg: isDark ? '#252525' : '#fafafa', dropdownBorder: isDark ? '#3a3a3a' : '#e8e8e8',
-      problemRowHover: isDark ? '#2e2e2e' : '#f0f4ff',
+      borderLight: isDark ? '#3a3a3a' : '#e8e8e8',
+      borderLighter: isDark ? '#2e2e2e' : '#f2f2f2',
+      muted: isDark ? '#999' : '#777',
+      mutedStrong: isDark ? '#bbb' : '#555',
+      headingText: isDark ? '#ddd' : '#222',
+      btnH: '30px', btnRadius: '5px', btnFontSize: '12px', btnFontWeight: '600',
+      btnBg: isDark ? '#2e2e2e' : '#f4f4f4',
+      btnText: isDark ? '#ccc' : '#444',
+      btnBorder: isDark ? '#484848' : '#d0d0d0',
+      btnActiveBg: '#1652d6', btnActiveText: '#ffffff', btnActiveBorder: '#1652d6',
+      tableHeaderText: isDark ? '#bbb' : '#666',
+      tableCellText: isDark ? '#ccc' : '#555',
+      emptyText: isDark ? '#666' : '#aaa',
+      selectBg: isDark ? '#242424' : '#fff',
+      selectText: isDark ? '#ddd' : '#333',
+      selectBorder: isDark ? '#484848' : '#d0d0d0',
+      inputBg: isDark ? '#242424' : '#fff',
+      inputText: isDark ? '#ddd' : '#333',
+      inputBorder: isDark ? '#484848' : '#d0d0d0',
+      dropdownBg: isDark ? '#202020' : '#ffffff',
+      dropdownBorder: isDark ? '#383838' : '#e0e0e0',
+      dropdownSection: isDark ? '#1a1a1a' : '#f9f9f9',
       problemLink: isDark ? '#7aabff' : '#1652d6',
-      solvedBadge: isDark ? '#1a3a1a' : '#e8f5e9', solvedBadgeText: isDark ? '#4caf50' : '#2e7d32',
-      waBadge: isDark ? '#3a1a1a' : '#fdecea', waBadgeText: isDark ? '#f48080' : '#c62828',
+      solvedBadge: isDark ? '#1a3320' : '#e6f4ea', solvedBadgeText: isDark ? '#4caf50' : '#276221',
+      waBadge: isDark ? '#331a1a' : '#fdecea', waBadgeText: isDark ? '#f48080' : '#b71c1c',
+      tleBg: isDark ? '#2a2000' : '#fff8e1', tleFg: isDark ? '#ffd54f' : '#b45309',
+      rteBg: isDark ? '#1a1a2e' : '#ede7f6', rteFg: isDark ? '#9fa8da' : '#4527a0',
+      mleBg: isDark ? '#002828' : '#e0f2f1', mleFg: isDark ? '#4db6ac' : '#00695c',
+      errBg: isDark ? '#2a2a2a' : '#f0f0f0', errFg: isDark ? '#999' : '#555',
     };
   }
 
   let theme = createTheme();
-  let frictionView      = DEFAULT_FRICTION === "problems" ? "problems" : "topics";
-  let defaultSortMode   = DEFAULT_SORT_MODE;
+  let defaultSortMode = (DEFAULT_SORT_MODE === "attempts" || DEFAULT_SORT_MODE === "wa") ? "errors" : DEFAULT_SORT_MODE;
+  if (defaultSortMode !== "errors" && defaultSortMode !== "rating") defaultSortMode = "errors";
   let hideAC            = DEFAULT_HIDE_AC;
   let minAttemptsGlobal = DEFAULT_MIN_ATTEMPTS;
 
   let frictionActiveTab = "category";
-
   let savedTimeline = DEFAULT_TIMELINE;
   let lastAppliedCustomStart = DEFAULT_CUSTOM_START;
   let lastAppliedCustomEnd   = DEFAULT_CUSTOM_END;
+  let activeTagFilters = new Set(DEFAULT_TAG_FILTERS);
 
   function autoSave() {
     saveSettings({
       category:    currentCategory || DEFAULT_CATEGORY,
       timeline:    savedTimeline,
       mode:        modeSelect.value,
-      friction:    frictionView,
       sortMode:    defaultSortMode,
       hideAC:      hideAC,
       minAttempts: minAttemptsGlobal,
       customStart: startDateInput ? startDateInput.value : "",
       customEnd:   endDateInput   ? endDateInput.value   : "",
+      tagFilters:  Array.from(activeTagFilters),
     });
   }
 
-  // Inject collapse animation CSS 
+  // ── GLOBAL STYLES ──
   if (!document.getElementById("cfpm-toggle-style")) {
     const s = document.createElement("style");
     s.id = "cfpm-toggle-style";
     s.textContent = `
-      #cfpm-compact { transition: box-shadow 0.2s; }
+      #cfpm-compact { box-sizing: border-box; }
       #cfpm-body {
         overflow: hidden;
         transition: max-height 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.28s ease;
-        max-height: 2000px;
-        opacity: 1;
+        max-height: 2000px; opacity: 1;
       }
-      #cfpm-body.cfpm-collapsed {
-        max-height: 0 !important;
-        opacity: 0;
-        pointer-events: none;
+      #cfpm-body.cfpm-collapsed { max-height: 0 !important; opacity: 0; pointer-events: none; }
+
+      #cfpm-chevron-btn {
+        display: flex; align-items: center; justify-content: center;
+        width: 22px; height: 22px; border-radius: 4px;
+        border: none; background: transparent; cursor: pointer;
+        flex-shrink: 0; outline: none !important;
+        -webkit-appearance: none; appearance: none; padding: 0;
       }
-      #cfpm-toggle-btn {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 3px 9px;
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 700;
-        cursor: pointer;
-        border: 1.5px solid;
-        transition: background 0.18s, color 0.18s, border-color 0.18s, box-shadow 0.18s;
-        letter-spacing: 0.03em;
-        flex-shrink: 0;
-        white-space: nowrap;
-        outline: none;
-        user-select: none;
+      #cfpm-chevron-btn:hover { background: rgba(128,128,128,0.1) !important; }
+      #cfpm-chevron-btn:focus, #cfpm-chevron-btn:active,
+      #cfpm-chevron-btn:focus-visible { outline: none !important; box-shadow: none !important; }
+      #cfpm-chevron-btn svg { transition: transform 0.22s cubic-bezier(0.4,0,0.2,1); }
+      #cfpm-chevron-btn.collapsed svg { transform: rotate(-90deg); }
+
+      #cfpm-compact button {
+        box-sizing: border-box; -webkit-appearance: none; appearance: none;
+        transition: none !important;
       }
-      #cfpm-toggle-btn:hover {
-        box-shadow: 0 0 0 3px rgba(22,82,214,0.18);
+      #cfpm-compact button:hover, #cfpm-compact button:focus,
+      #cfpm-compact button:active, #cfpm-compact button:focus-visible {
+        outline: none !important; box-shadow: none !important;
+        filter: none !important; -webkit-filter: none !important;
       }
-      #cfpm-toggle-btn .cfpm-dot {
-        width: 7px; height: 7px;
-        border-radius: 50%;
-        display: inline-block;
-        transition: background 0.18s;
-        flex-shrink: 0;
+
+      .cfpm-cat-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        height: 28px; padding: 0 14px; border-radius: 14px;
+        font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+        flex-shrink: 0; outline: none !important;
       }
+      .cfpm-icon-btn {
+        width: 30px; height: 30px; border-radius: 5px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; flex-shrink: 0; outline: none !important; padding: 0;
+      }
+      .cfpm-pill-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        height: 30px; padding: 0 12px; border-radius: 5px;
+        font-size: 12px; font-weight: 600; cursor: pointer;
+        white-space: nowrap; outline: none !important;
+      }
+      .cfpm-step-btn {
+        width: 28px; height: 28px; border-radius: 5px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; flex-shrink: 0; outline: none !important;
+        -webkit-appearance: none; appearance: none;
+      }
+      .cfpm-tag-pill {
+        display: inline-flex; align-items: center; gap: 4px;
+        height: 22px; padding: 0 8px; border-radius: 11px; font-size: 11px;
+        font-weight: 600; cursor: pointer; white-space: nowrap; user-select: none;
+      }
+      .cfpm-tag-opt {
+        display: flex; align-items: center; gap: 8px;
+        padding: 6px 12px; font-size: 12px; cursor: pointer; user-select: none;
+        word-break: break-word;
+      }
+      .cfpm-tag-check {
+        width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 9px; color: #fff; box-sizing: border-box;
+      }
+      .cfpm-sort-opt {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 14px; font-size: 13px; cursor: pointer; user-select: none;
+      }
+      .cfpm-src-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        height: 26px; padding: 0 11px; border-radius: 4px;
+        font-size: 11px; font-weight: 600; cursor: pointer;
+        white-space: nowrap; border: none; outline: none !important;
+      }
+      #cfpm-filter-dd {
+        position: absolute; top: calc(100% + 6px); right: 0; z-index: 10000;
+        border-radius: 7px; overflow: hidden; min-width: 248px; max-width: 290px;
+        display: flex; flex-direction: column;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.13), 0 1.5px 4px rgba(0,0,0,0.07);
+      }
+      #cfpm-sort-dd {
+        position: absolute; top: calc(100% + 6px); right: 0; z-index: 10000;
+        border-radius: 7px; overflow: hidden; min-width: 190px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.13), 0 1.5px 4px rgba(0,0,0,0.07);
+      }
+      #cfpm-tag-list { overflow-y: auto; max-height: 180px; }
+      #cfpm-tag-list::-webkit-scrollbar { width: 4px; }
+      #cfpm-tag-list::-webkit-scrollbar-track { background: transparent; }
+      #cfpm-tag-list::-webkit-scrollbar-thumb { border-radius: 2px; background: rgba(128,128,128,0.25); }
     `;
     document.head.appendChild(s);
   }
@@ -187,118 +253,101 @@
   card.style.cssText = [
     "box-sizing:border-box", "font-family:Arial,sans-serif", "font-size:14px",
     `color:${theme.text}`, `background:${theme.bg}`, `border:1px solid ${theme.border}`,
-    "border-radius:6px", "padding:0", "margin-top:10px", "max-width:920px"
+    "border-radius:5px", "padding:0", "margin-top:10px", "max-width:920px"
   ].join(";");
 
-  //  Header bar (always visible)
+  // ── HEADER BAR ──
   const headerBar = document.createElement("div");
   headerBar.style.cssText = [
     "display:flex", "align-items:center", "justify-content:space-between",
-    "padding:5px 16px", "gap:10px", "min-height:32px", "box-sizing:border-box"
+    "padding:5px 12px", "gap:10px", "min-height:32px", "box-sizing:border-box"
   ].join(";");
 
   const headerTitle = document.createElement("span");
-  headerTitle.style.cssText = `font-size:11px;font-weight:700;color:${theme.muted};letter-spacing:0.04em;opacity:0.75;cursor:default;user-select:none;`;
-  headerTitle.textContent = "⚡ CF Performance Mirror";
+  headerTitle.style.cssText = `font-size:11px;font-weight:700;color:${theme.muted};letter-spacing:0.1em;cursor:default;user-select:none;font-family:monospace;opacity:0.8;`;
+  headerTitle.textContent = "cfpm";
 
-  // Toggle button 
   const toggleBtn = document.createElement("button");
-  toggleBtn.id = "cfpm-toggle-btn";
-
-  const dot = document.createElement("span");
-  dot.className = "cfpm-dot";
-
-  const toggleLabel = document.createElement("span");
-
-  toggleBtn.appendChild(dot);
-  toggleBtn.appendChild(toggleLabel);
+  toggleBtn.id = "cfpm-chevron-btn";
+  toggleBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5l4 4 4-4"/></svg>`;
 
   function applyToggleVisuals() {
     if (isEnabled) {
-      dot.style.background       = "#22c55e";
-      toggleLabel.textContent    = "ON";
-      toggleBtn.style.background = detectDarkMode() ? "#1a2e1a" : "#f0fdf4";
-      toggleBtn.style.color      = "#22c55e";
-      toggleBtn.style.borderColor= "#22c55e";
+      toggleBtn.classList.remove("collapsed");
+      toggleBtn.title = "Collapse";
+      toggleBtn.style.color = theme.muted;
+      headerTitle.style.opacity = "0.8";
     } else {
-      dot.style.background       = detectDarkMode() ? "#888" : "#aaa";
-      toggleLabel.textContent    = "OFF";
-      toggleBtn.style.background = detectDarkMode() ? "#2a2a2a" : "#f5f5f5";
-      toggleBtn.style.color      = detectDarkMode() ? "#999" : "#888";
-      toggleBtn.style.borderColor= detectDarkMode() ? "#555" : "#ccc";
+      toggleBtn.classList.add("collapsed");
+      toggleBtn.title = "Expand";
+      toggleBtn.style.color = theme.muted;
+      headerTitle.style.opacity = "0.4";
     }
   }
   applyToggleVisuals();
 
-  // Body wrapper (everything that collapses) 
   const body = document.createElement("div");
   body.id = "cfpm-body";
-  body.style.cssText = "padding:0 16px 16px 16px;box-sizing:border-box;";
+  body.style.cssText = "padding:0 14px 14px 14px;box-sizing:border-box;";
   if (!isEnabled) body.classList.add("cfpm-collapsed");
 
   toggleBtn.addEventListener("click", () => {
     isEnabled = !isEnabled;
     saveToggle(isEnabled);
     applyToggleVisuals();
-    if (isEnabled) {
-      body.classList.remove("cfpm-collapsed");
-      headerTitle.style.opacity = "0.75";
-    } else {
-      body.classList.add("cfpm-collapsed");
-      headerTitle.style.opacity = "0.45";
-    }
+    body.classList.toggle("cfpm-collapsed", !isEnabled);
   });
 
   headerBar.appendChild(headerTitle);
   headerBar.appendChild(toggleBtn);
   card.appendChild(headerBar);
 
-  //  Divider between header and body 
   const headerDivider = document.createElement("div");
   headerDivider.id = "cfpm-header-divider";
-  headerDivider.style.cssText = `height:1px;background:${theme.borderLight};margin:0;transition:opacity 0.28s;`;
+  headerDivider.style.cssText = `height:1px;background:${theme.borderLight};margin:0;`;
   card.appendChild(headerDivider);
-
   card.appendChild(body);
 
+  // ── Controls row ──
   const controlsRow = document.createElement("div");
-  controlsRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;min-height:36px;margin-top:14px;";
+  controlsRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;min-height:36px;margin-top:12px;";
 
   const leftControls = document.createElement("div");
-  leftControls.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;";
+  leftControls.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;align-items:center;";
 
   const categoryButtons = {};
   CATEGORIES.forEach(cat => {
     const b = document.createElement("button");
+    b.className = "cfpm-cat-btn";
     b.textContent = cat; b.dataset.cat = cat;
-    b.style.cssText = [
-      "padding:6px 12px", "border-radius:12px", `border:1px solid ${theme.buttonBorder}`,
-      `background:${theme.buttonBg}`, `color:${theme.buttonText}`,
-      "cursor:pointer", "font-weight:600", "font-size:13px", "white-space:nowrap", "flex-shrink:0"
-    ].join(";");
+    b.style.cssText = [`background:${theme.btnBg}`, `color:${theme.btnText}`, `border:1px solid ${theme.btnBorder}`, "cursor:pointer"].join(";");
     b.addEventListener("click", () => { renderCategory(cat); autoSave(); });
     categoryButtons[cat] = b;
     leftControls.appendChild(b);
   });
 
   const rightControls = document.createElement("div");
-  rightControls.style.cssText = "display:flex;align-items:center;gap:8px;flex-shrink:0;";
+  rightControls.style.cssText = "display:flex;align-items:center;gap:7px;flex-shrink:0;";
+
+  function selectStyle() {
+    return `height:30px;padding:0 8px;border-radius:5px;border:1px solid ${theme.selectBorder};background:${theme.selectBg};color:${theme.selectText};font-size:12px;font-family:Arial,sans-serif;white-space:nowrap;outline:none;cursor:pointer;`;
+  }
 
   const timelineSelect = document.createElement("select");
   [
-    { value: "all",    label: "All Time"      },
-    { value: "1",      label: "Last Month"    },
-    { value: "3",      label: "Last 3 Months" },
-    { value: "6",      label: "Last 6 Months" },
-    { value: "12",     label: "Last Year"     },
-    { value: "24",     label: "Last 2 Years"  },
-    { value: "custom", label: "Custom Range"  }
+    { value: "all",    label: "All time"      },
+    { value: "1",      label: "Last month"    },
+    { value: "3",      label: "Last 3 months" },
+    { value: "6",      label: "Last 6 months" },
+    { value: "12",     label: "Last year"     },
+    { value: "24",     label: "Last 2 years"  },
+    { value: "custom", label: "Custom range"  }
   ].forEach(opt => {
     const o = document.createElement("option");
     o.value = opt.value; o.textContent = opt.label; timelineSelect.appendChild(o);
   });
   timelineSelect.value = DEFAULT_TIMELINE;
-  timelineSelect.style.cssText = `padding:6px 8px;border-radius:6px;border:1px solid ${theme.selectBorder};background:${theme.selectBg};color:${theme.selectText};font-size:13px;white-space:nowrap;min-width:120px;`;
+  timelineSelect.style.cssText = selectStyle() + "min-width:130px;";
 
   let timelineValueOnFocus = timelineSelect.value;
   timelineSelect.addEventListener("mousedown", () => { timelineValueOnFocus = timelineSelect.value; });
@@ -313,18 +362,19 @@
     }
   });
   timelineSelect.addEventListener("click", () => {
-    if (timelineSelect.value === "custom" && timelineValueOnFocus === "custom") {
-      customDateRow.style.display = "flex";
-    }
+    if (timelineSelect.value === "custom" && timelineValueOnFocus === "custom") customDateRow.style.display = "flex";
   });
 
   const modeSelect = document.createElement("select");
-  ["total", "rated", "unrated"].forEach(opt => {
-    const o = document.createElement("option");
-    o.value = opt; o.textContent = opt[0].toUpperCase() + opt.slice(1); modeSelect.appendChild(o);
+  [
+    { value: "total",   label: "Total"   },
+    { value: "rated",   label: "Rated"   },
+    { value: "unrated", label: "Unrated" }
+  ].forEach(opt => {
+    const o = document.createElement("option"); o.value = opt.value; o.textContent = opt.label; modeSelect.appendChild(o);
   });
   modeSelect.value = DEFAULT_MODE;
-  modeSelect.style.cssText = `padding:6px 8px;border-radius:6px;border:1px solid ${theme.selectBorder};background:${theme.selectBg};color:${theme.selectText};font-size:13px;white-space:nowrap;min-width:90px;`;
+  modeSelect.style.cssText = selectStyle() + "min-width:90px;";
   modeSelect.addEventListener("change", () => { renderCategory(currentCategory || DEFAULT_CATEGORY); autoSave(); });
 
   rightControls.appendChild(timelineSelect);
@@ -333,43 +383,42 @@
   controlsRow.appendChild(rightControls);
   body.appendChild(controlsRow);
 
+  // ── Custom date row ──
   const customDateRow = document.createElement("div");
-  customDateRow.style.cssText = `display:none;align-items:center;gap:8px;margin-bottom:8px;padding:8px;background:${theme.bg};border:1px solid ${theme.border};border-radius:6px;flex-wrap:wrap;min-height:44px;`;
+  customDateRow.style.cssText = `display:none;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;background:${theme.dropdownSection};border:1px solid ${theme.borderLight};border-radius:5px;flex-wrap:wrap;`;
 
   const dateFromLabel = document.createElement("span");
-  dateFromLabel.textContent = "From:";
-  dateFromLabel.style.cssText = `color:${theme.text};font-size:13px;font-weight:600;white-space:nowrap;`;
+  dateFromLabel.textContent = "From";
+  dateFromLabel.style.cssText = `color:${theme.muted};font-size:12px;font-weight:600;white-space:nowrap;`;
   const startDateInput = document.createElement("input");
-  startDateInput.type = "date";
-  startDateInput.value = DEFAULT_CUSTOM_START;
-  startDateInput.style.cssText = `padding:6px 8px;border-radius:4px;border:1px solid ${theme.inputBorder};background:${theme.inputBg};color:${theme.inputText};font-size:13px;flex:1 1 140px;min-width:140px;max-width:180px;color-scheme:${detectDarkMode()?"dark":"light"};`;
+  startDateInput.type = "date"; startDateInput.value = DEFAULT_CUSTOM_START;
+  startDateInput.style.cssText = `height:30px;padding:0 8px;border-radius:5px;border:1px solid ${theme.inputBorder};background:${theme.inputBg};color:${theme.inputText};font-size:12px;flex:1 1 130px;min-width:130px;max-width:170px;color-scheme:${detectDarkMode()?"dark":"light"};outline:none;`;
   const dateToLabel = document.createElement("span");
-  dateToLabel.textContent = "To:";
-  dateToLabel.style.cssText = `color:${theme.text};font-size:13px;font-weight:600;white-space:nowrap;`;
+  dateToLabel.textContent = "To";
+  dateToLabel.style.cssText = `color:${theme.muted};font-size:12px;font-weight:600;white-space:nowrap;`;
   const endDateInput = document.createElement("input");
-  endDateInput.type = "date";
-  endDateInput.value = DEFAULT_CUSTOM_END;
-  endDateInput.style.cssText = `padding:6px 8px;border-radius:4px;border:1px solid ${theme.inputBorder};background:${theme.inputBg};color:${theme.inputText};font-size:13px;flex:1 1 140px;min-width:140px;max-width:180px;color-scheme:${detectDarkMode()?"dark":"light"};`;
+  endDateInput.type = "date"; endDateInput.value = DEFAULT_CUSTOM_END;
+  endDateInput.style.cssText = `height:30px;padding:0 8px;border-radius:5px;border:1px solid ${theme.inputBorder};background:${theme.inputBg};color:${theme.inputText};font-size:12px;flex:1 1 130px;min-width:130px;max-width:170px;color-scheme:${detectDarkMode()?"dark":"light"};outline:none;`;
 
   const dateButtonGroup = document.createElement("div");
-  dateButtonGroup.style.cssText = "display:flex;gap:6px;margin-left:auto;";
+  dateButtonGroup.style.cssText = "display:flex;gap:6px;margin-left:auto;align-items:center;";
   const applyDateBtn = document.createElement("button");
+  applyDateBtn.className = "cfpm-pill-btn";
   applyDateBtn.textContent = "Apply";
-  applyDateBtn.style.cssText = `padding:6px 16px;border-radius:4px;border:1px solid ${theme.activeButtonBg};background:${theme.activeButtonBg};color:${theme.activeButtonText};cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;`;
+  applyDateBtn.style.cssText = `background:${theme.btnActiveBg};color:${theme.btnActiveText};border:1px solid ${theme.btnActiveBorder};cursor:pointer;`;
   const cancelDateBtn = document.createElement("button");
+  cancelDateBtn.className = "cfpm-pill-btn";
   cancelDateBtn.textContent = "Cancel";
-  cancelDateBtn.style.cssText = `padding:6px 16px;border-radius:4px;border:1px solid ${theme.buttonBorder};background:${theme.buttonBg};color:${theme.buttonText};cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;`;
+  cancelDateBtn.style.cssText = `background:${theme.btnBg};color:${theme.btnText};border:1px solid ${theme.btnBorder};cursor:pointer;`;
   const dateValidationMsg = document.createElement("span");
-  dateValidationMsg.style.cssText = "color:#e74c3c;font-size:12px;font-weight:600;display:none;white-space:nowrap;";
-  dateValidationMsg.textContent = "Please select both dates.";
+  dateValidationMsg.style.cssText = "color:#e74c3c;font-size:11px;font-weight:600;display:none;white-space:nowrap;";
+  dateValidationMsg.textContent = "Select both dates.";
 
   dateButtonGroup.appendChild(dateValidationMsg);
   dateButtonGroup.appendChild(applyDateBtn);
   dateButtonGroup.appendChild(cancelDateBtn);
-  customDateRow.appendChild(dateFromLabel);
-  customDateRow.appendChild(startDateInput);
-  customDateRow.appendChild(dateToLabel);
-  customDateRow.appendChild(endDateInput);
+  customDateRow.appendChild(dateFromLabel); customDateRow.appendChild(startDateInput);
+  customDateRow.appendChild(dateToLabel);   customDateRow.appendChild(endDateInput);
   customDateRow.appendChild(dateButtonGroup);
   body.appendChild(customDateRow);
 
@@ -394,63 +443,19 @@
   });
 
   const info = document.createElement("div");
-  info.style.cssText = `color:${theme.muted};font-size:13px;margin-top:4px;margin-bottom:12px;`;
+  info.style.cssText = `color:${theme.muted};font-size:12px;margin-top:2px;margin-bottom:10px;`;
   info.textContent = "Loading…";
   body.appendChild(info);
 
   const tableWrap = document.createElement("div");
-  tableWrap.style.cssText = "overflow-x:auto;margin-bottom:14px;";
+  tableWrap.style.cssText = "overflow-x:auto;margin-bottom:12px;";
   const table = document.createElement("table");
   table.style.cssText = "border-collapse:collapse;font-size:13px;width:100%;";
   tableWrap.appendChild(table);
   body.appendChild(tableWrap);
 
   const frictionSection = document.createElement("div");
-  frictionSection.style.cssText = `margin-top:12px;border-top:1px solid ${theme.borderLight};padding-top:10px;`;
-
-  function makeFrictionToggleBtn(label, value) {
-    const b = document.createElement("button");
-    b.textContent = label; b.dataset.fview = value;
-    b.style.cssText = [
-      "padding:6px 12px", "border-radius:6px", `border:1px solid ${theme.buttonBorder}`,
-      `background:${theme.buttonBg}`, `color:${theme.buttonText}`,
-      "cursor:pointer", "font-weight:600", "font-size:13px", "white-space:nowrap",
-      "transition:background 0.15s,color 0.15s"
-    ].join(";");
-    b.addEventListener("click", () => {
-      frictionView = value;
-      defaultSortMode = value === "problems" ? "errors" : "wa";
-      updateFrictionToggleBtns();
-      if (lastModeData) renderFrictionPanels(lastModeData, currentCategory || DEFAULT_CATEGORY);
-      autoSave();
-    });
-    return b;
-  }
-
-  const btnTopics   = makeFrictionToggleBtn("Topics",   "topics");
-  const btnProblems = makeFrictionToggleBtn("Problems", "problems");
-
-  function updateFrictionToggleBtns() {
-    [btnTopics, btnProblems].forEach(b => {
-      const active = b.dataset.fview === frictionView;
-      b.style.background = active ? theme.activeButtonBg : theme.buttonBg;
-      b.style.color      = active ? theme.activeButtonText : theme.buttonText;
-      b.style.border     = active ? `1px solid ${theme.activeButtonBg}` : `1px solid ${theme.buttonBorder}`;
-    });
-  }
-  updateFrictionToggleBtns();
-
-  const frictionToggleRow = document.createElement("div");
-  frictionToggleRow.style.cssText = "display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-bottom:8px;";
-
-  const frictionToggleBtns = document.createElement("div");
-  frictionToggleBtns.style.cssText = "display:flex;gap:6px;flex-shrink:0;";
-  frictionToggleBtns.appendChild(btnTopics);
-  frictionToggleBtns.appendChild(btnProblems);
-
-  frictionToggleRow.appendChild(frictionToggleBtns);
-  frictionSection.appendChild(frictionToggleRow);
-
+  frictionSection.style.cssText = `margin-top:10px;border-top:1px solid ${theme.borderLight};padding-top:10px;`;
   const frictionScrollBox = document.createElement("div");
   frictionScrollBox.style.cssText = [
     "height:265px", "overflow:hidden", `border:1px solid ${theme.borderLight}`,
@@ -487,25 +492,25 @@
     info.style.color = theme.muted;
     frictionSection.style.borderTop = `1px solid ${theme.borderLight}`;
     frictionScrollBox.style.border = `1px solid ${theme.borderLight}`;
-    timelineSelect.style.background = theme.selectBg; timelineSelect.style.color = theme.selectText; timelineSelect.style.borderColor = theme.selectBorder;
-    modeSelect.style.background = theme.selectBg; modeSelect.style.color = theme.selectText; modeSelect.style.borderColor = theme.selectBorder;
-    customDateRow.style.background = theme.bg; customDateRow.style.borderColor = theme.border;
-    dateFromLabel.style.color = theme.text; dateToLabel.style.color = theme.text;
+    timelineSelect.style.cssText = selectStyle() + "min-width:130px;";
+    modeSelect.style.cssText = selectStyle() + "min-width:90px;";
+    customDateRow.style.background = theme.dropdownSection; customDateRow.style.borderColor = theme.borderLight;
+    dateFromLabel.style.color = theme.muted; dateToLabel.style.color = theme.muted;
     const cs = detectDarkMode() ? "dark" : "light";
     startDateInput.style.colorScheme = cs; endDateInput.style.colorScheme = cs;
     startDateInput.style.background = theme.inputBg; startDateInput.style.color = theme.inputText; startDateInput.style.borderColor = theme.inputBorder;
     endDateInput.style.background   = theme.inputBg; endDateInput.style.color   = theme.inputText; endDateInput.style.borderColor   = theme.inputBorder;
-    applyDateBtn.style.background = theme.activeButtonBg; applyDateBtn.style.color = theme.activeButtonText;
-    cancelDateBtn.style.background = theme.buttonBg; cancelDateBtn.style.color = theme.buttonText; cancelDateBtn.style.borderColor = theme.buttonBorder;
+    applyDateBtn.style.background = theme.btnActiveBg; applyDateBtn.style.color = theme.btnActiveText; applyDateBtn.style.borderColor = theme.btnActiveBorder;
+    cancelDateBtn.style.background = theme.btnBg; cancelDateBtn.style.color = theme.btnText; cancelDateBtn.style.borderColor = theme.btnBorder;
     headerTitle.style.color = theme.muted;
+    toggleBtn.style.color = theme.muted;
     applyToggleVisuals();
     Object.keys(categoryButtons).forEach(k => {
       const b = categoryButtons[k], active = k === currentCategory;
-      b.style.background = active ? theme.activeButtonBg : theme.buttonBg;
-      b.style.color      = active ? theme.activeButtonText : theme.buttonText;
-      b.style.border     = active ? `1px solid ${theme.activeButtonBg}` : `1px solid ${theme.buttonBorder}`;
+      b.style.background  = active ? theme.btnActiveBg : theme.btnBg;
+      b.style.color       = active ? theme.btnActiveText : theme.btnText;
+      b.style.borderColor = active ? theme.btnActiveBorder : theme.btnBorder;
     });
-    updateFrictionToggleBtns();
   }
 
   function updateTheme() {
@@ -524,7 +529,12 @@
   themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class','style','data-theme'] });
   ['.info','.roundbox','#pageContent'].map(sel => document.querySelector(sel)).filter(Boolean)
     .forEach(el => themeObserver.observe(el, { attributes: true, attributeFilter: ['style','class'] }));
-  const _themeInterval = setInterval(updateTheme, 500); void _themeInterval;
+
+  // FIX #10: Clear any existing interval before setting a new one to prevent
+  // duplicate intervals if the script ever reinjects on the same page session.
+  if (window._cfpmThemeInterval) clearInterval(window._cfpmThemeInterval);
+  window._cfpmThemeInterval = setInterval(updateTheme, 500);
+
   window.addEventListener('focus', updateTheme);
 
   function median(arr) {
@@ -613,8 +623,8 @@
     });
 
     let participated = new Set();
-    if (mode === "total")       participated = new Set([...ratedContestSet, ...inWindowSet]);
-    else if (mode === "rated")  participated = new Set([...ratedContestSet]);
+    if (mode === "total")      participated = new Set([...ratedContestSet, ...inWindowSet]);
+    else if (mode === "rated") participated = new Set([...ratedContestSet]);
     else inWindowSet.forEach(cid => { if (!ratedContestSet.has(cid)) participated.add(cid); });
 
     if (cutoffTime !== 0 || endTime !== now) {
@@ -627,31 +637,20 @@
     }
 
     const categoryIndexTimes = {}, categoryIndexAttempts = {}, categoryIndexSolved = {};
-    const categoryTopicAttempts = {}, categoryTopicSolved = {};
-    const categoryContestCount = {};
-    const categoryTopicWAProblems = {};
-    const categoryRawWAMap = {};
-
+    const categoryContestCount = {}, categoryRawWAMap = {};
     CATEGORIES.forEach(c => {
       categoryIndexTimes[c] = {}; categoryIndexAttempts[c] = {}; categoryIndexSolved[c] = {};
-      categoryTopicAttempts[c] = {}; categoryTopicSolved[c] = {};
-      categoryContestCount[c] = new Set();
-      categoryTopicWAProblems[c] = {};
-      categoryRawWAMap[c] = new Map();
+      categoryContestCount[c] = new Set(); categoryRawWAMap[c] = new Map();
     });
 
-    const globalTopicWAProblems = {};
-    const globalAttempts = {}, globalSolved = {};
-    const practiceAttempts = {}, practiceSolved = {};
-    const globalRawWAMap   = new Map();
     const practiceRawWAMap = new Map();
-
     const unofficialContests = new Set();
     participated.forEach(cid => { if (!ratedContestSet.has(cid)) unofficialContests.add(cid); });
 
     const everAC = new Set();
     rawSubmissions.forEach(s => { if (s.verdict === "OK" && s.problem) everAC.add(s.problem.contestId + "-" + s.problem.index); });
 
+    // Build category problem shells
     filteredSubmissions.forEach(s => {
       if (!s.problem) return;
       const cid = s.problem.contestId;
@@ -665,19 +664,36 @@
       const tags = s.problem.tags || [];
       let cat = classifyContest(contest);
       if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contest, unofficialContests.has(cid));
-      if (!categoryIndexAttempts[cat]) cat = "Other";
-      if (!categoryIndexAttempts[cat]) return;
+      if (!categoryRawWAMap[cat]) cat = "Other";
+      if (!categoryRawWAMap[cat]) return;
 
       const info_ = { pid, name: s.problem.name||idx, contestId: cid, contestName: contest.name||("Contest "+cid), index: idx, rating: s.problem.rating||null, tags: tags.slice(), solved: everAC.has(pid), wa:0, tle:0, rte:0, mle:0, other:0 };
-      tags.forEach(t => {
-        if (!categoryTopicWAProblems[cat][t]) categoryTopicWAProblems[cat][t] = new Map();
-        if (!categoryTopicWAProblems[cat][t].has(pid)) categoryTopicWAProblems[cat][t].set(pid, { ...info_ });
-        categoryTopicWAProblems[cat][t].get(pid).solved = everAC.has(pid);
-      });
       if (!categoryRawWAMap[cat].has(pid)) categoryRawWAMap[cat].set(pid, { ...info_ });
       categoryRawWAMap[cat].get(pid).solved = everAC.has(pid);
     });
 
+    // Build practice problem shells (out-of-contest, within timeline)
+    filteredSubmissions.forEach(s => {
+      if (!s.problem) return;
+      const cid = s.problem.contestId;
+      const contest = contestMap[cid];
+      const tags = s.problem.tags || [];
+      const idx = s.problem.index, pid = cid + "-" + idx;
+      const contestName = contest ? (contest.name || ("Contest " + cid)) : ("Contest " + cid);
+
+      let duringContest = false;
+      if (contest && typeof contest.startTimeSeconds === "number" && typeof contest.durationSeconds === "number") {
+        const start = contest.startTimeSeconds, end = start + contest.durationSeconds, st = s.creationTimeSeconds;
+        if (typeof st === "number" && st >= start && st <= end) duringContest = true;
+      }
+      if (duringContest) return;
+
+      const mkInfo = () => ({ pid, name: s.problem.name||idx, contestId: cid, contestName, index: idx, rating: s.problem.rating||null, tags: tags.slice(), solved: everAC.has(pid), wa:0, tle:0, rte:0, mle:0, other:0 });
+      if (!practiceRawWAMap.has(pid)) practiceRawWAMap.set(pid, mkInfo());
+      practiceRawWAMap.get(pid).solved = everAC.has(pid);
+    });
+
+    // First AC tracking
     const firstACSet = new Set();
     filteredSubmissions.forEach(s => {
       if (!s.problem) return;
@@ -689,15 +705,13 @@
       if (typeof st !== "number" || st < start || st > end) return;
 
       const idx = s.problem.index, pid = cid + "-" + idx;
-      const tags = s.problem.tags || [];
       let cat = classifyContest(contest);
       if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contest, unofficialContests.has(cid));
       if (!categoryIndexAttempts[cat]) {
         cat = "Other";
         if (!categoryIndexAttempts[cat]) {
           categoryIndexAttempts[cat]={}; categoryIndexTimes[cat]={}; categoryIndexSolved[cat]={};
-          categoryTopicAttempts[cat]={}; categoryTopicSolved[cat]={};
-          categoryTopicWAProblems[cat]={}; categoryRawWAMap[cat]=new Map(); categoryContestCount[cat]=new Set();
+          categoryRawWAMap[cat]=new Map(); categoryContestCount[cat]=new Set();
         }
       }
 
@@ -705,11 +719,7 @@
       categoryIndexAttempts[cat][idx] = (categoryIndexAttempts[cat][idx]||0) + 1;
       categoryIndexTimes[cat][idx] = categoryIndexTimes[cat][idx] || [];
 
-      if (s.verdict !== "OK") {
-        tags.forEach(t => { categoryTopicAttempts[cat][t] = (categoryTopicAttempts[cat][t]||0)+1; });
-        return;
-      }
-      tags.forEach(t => { categoryTopicSolved[cat][t] = (categoryTopicSolved[cat][t]||0)+1; });
+      if (s.verdict !== "OK") return;
       if (firstACSet.has(pid)) return;
       firstACSet.add(pid);
       categoryIndexSolved[cat][idx] = (categoryIndexSolved[cat][idx]||0)+1;
@@ -717,6 +727,7 @@
       if (timeMin >= 0 && timeMin <= maxAllowed) categoryIndexTimes[cat][idx].push(timeMin);
     });
 
+    // Error counting for category problems
     filteredSubmissions.forEach(s => {
       if (!s.problem || s.verdict === "OK") return;
       const cid = s.problem.contestId;
@@ -725,97 +736,41 @@
       if (!contest || typeof contest.startTimeSeconds !== "number" || typeof contest.durationSeconds !== "number") return;
       const start = contest.startTimeSeconds, end = start + contest.durationSeconds, st = s.creationTimeSeconds;
       if (typeof st !== "number" || st < start || st > end) return;
-      const idx = s.problem.index, pid = cid + "-" + idx;
-      const tags = s.problem.tags || [];
+      const pid = cid + "-" + s.problem.index;
       const vtype = s.verdict === "WRONG_ANSWER" ? "wa" : s.verdict === "TIME_LIMIT_EXCEEDED" ? "tle" : s.verdict === "RUNTIME_ERROR" ? "rte" : s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle" : "other";
       let cat = classifyContest(contestMap[cid]);
       if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contestMap[cid], unofficialContests.has(cid));
-      if (!categoryTopicWAProblems[cat]) cat = "Other";
-      if (!categoryTopicWAProblems[cat]) return;
-      tags.forEach(t => { if (categoryTopicWAProblems[cat][t]?.has(pid)) categoryTopicWAProblems[cat][t].get(pid)[vtype]++; });
-      if (categoryRawWAMap[cat]?.has(pid)) categoryRawWAMap[cat].get(pid)[vtype]++;
+      if (!categoryRawWAMap[cat]) cat = "Other";
+      if (!categoryRawWAMap[cat]) return;
+      if (categoryRawWAMap[cat].has(pid)) categoryRawWAMap[cat].get(pid)[vtype]++;
     });
 
-    const practiceTopicWAProblems = {};
-
+    // Error counting for practice problems
     filteredSubmissions.forEach(s => {
-      if (!s.problem) return;
-      const cid = s.problem.contestId, contest = contestMap[cid];
-      if (!contest) return;
-      const tags = s.problem.tags || [];
-      const idx = s.problem.index, pid = cid + "-" + idx;
-      const contestName = contest.name || ("Contest " + cid);
-      const start = contest.startTimeSeconds, dur = contest.durationSeconds, st = s.creationTimeSeconds;
-      const duringContest = typeof start === "number" && typeof dur === "number" && typeof st === "number" && st >= start && st <= start + dur;
-      const mkInfo = () => ({ pid, name: s.problem.name||idx, contestId: cid, contestName, index: idx, rating: s.problem.rating||null, tags: tags.slice(), solved: everAC.has(pid), wa:0, tle:0, rte:0, mle:0, other:0 });
-
-      if (!globalRawWAMap.has(pid)) globalRawWAMap.set(pid, mkInfo());
-      globalRawWAMap.get(pid).solved = everAC.has(pid);
-      if (!duringContest) {
-        if (!practiceRawWAMap.has(pid)) practiceRawWAMap.set(pid, mkInfo());
-        practiceRawWAMap.get(pid).solved = everAC.has(pid);
+      if (!s.problem || s.verdict === "OK") return;
+      const cid = s.problem.contestId;
+      const contest = contestMap[cid];
+      let duringContest = false;
+      if (contest && typeof contest.startTimeSeconds === "number" && typeof contest.durationSeconds === "number") {
+        const start = contest.startTimeSeconds, end = start + contest.durationSeconds, st = s.creationTimeSeconds;
+        if (typeof st === "number" && st >= start && st <= end) duringContest = true;
       }
-
-      if (s.verdict !== "OK") {
-        const vtype = s.verdict === "WRONG_ANSWER" ? "wa" : s.verdict === "TIME_LIMIT_EXCEEDED" ? "tle" : s.verdict === "RUNTIME_ERROR" ? "rte" : s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle" : "other";
-
-        tags.forEach(t => {
-          if (!globalTopicWAProblems[t]) globalTopicWAProblems[t] = new Map();
-          if (!globalTopicWAProblems[t].has(pid)) globalTopicWAProblems[t].set(pid, mkInfo());
-          globalTopicWAProblems[t].get(pid).solved = everAC.has(pid);
-          globalTopicWAProblems[t].get(pid)[vtype]++;
-        });
-        globalRawWAMap.get(pid)[vtype]++;
-
-        if (!duringContest) {
-          tags.forEach(t => {
-            if (!practiceTopicWAProblems[t]) practiceTopicWAProblems[t] = new Map();
-            if (!practiceTopicWAProblems[t].has(pid)) practiceTopicWAProblems[t].set(pid, mkInfo());
-            practiceTopicWAProblems[t].get(pid).solved = everAC.has(pid);
-            practiceTopicWAProblems[t].get(pid)[vtype]++;
-          });
-          practiceRawWAMap.get(pid)[vtype]++;
-        }
-
-        tags.forEach(t => { globalAttempts[t] = (globalAttempts[t]||0)+1; });
-        if (!duringContest) tags.forEach(t => { practiceAttempts[t] = (practiceAttempts[t]||0)+1; });
-        return;
-      }
-
-      tags.forEach(t => { globalSolved[t] = (globalSolved[t]||0)+1; });
-      if (!duringContest) tags.forEach(t => { practiceSolved[t] = (practiceSolved[t]||0)+1; });
+      if (duringContest) return;
+      const pid = cid + "-" + s.problem.index;
+      if (!practiceRawWAMap.has(pid)) return;
+      const vtype = s.verdict === "WRONG_ANSWER" ? "wa" : s.verdict === "TIME_LIMIT_EXCEEDED" ? "tle" : s.verdict === "RUNTIME_ERROR" ? "rte" : s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle" : "other";
+      practiceRawWAMap.get(pid)[vtype]++;
     });
-
-    function buildTopicFriction(attMap, waMap) {
-      return Object.keys(attMap).map(t => {
-        // Only include problems that actually have at least one error
-        const waProblems = waMap[t]
-          ? Array.from(waMap[t].values()).filter(p => totalErrors(p) > 0).sort((x,y) => totalErrors(y)-totalErrors(x))
-          : [];
-        // WA% = total errors / (total errors + number of those problems that were eventually solved)
-        const totalWrong = waProblems.reduce((s, p) => s + totalErrors(p), 0);
-        const totalAC    = waProblems.filter(p => p.solved).length;
-        const waRatio    = (totalWrong + totalAC) > 0 ? Math.round((totalWrong / (totalWrong + totalAC)) * 100) : 0;
-        const attempts   = attMap[t] || 0;
-        return { topic: t, waRatio, attempts, waProblems };
-      }).filter(x => x.attempts >= 1).sort((a, b) => b.waRatio - a.waRatio);
-    }
-
-    const contestFriction  = buildTopicFriction(categoryTopicAttempts[categoryFilter]||{}, categoryTopicWAProblems[categoryFilter]||{});
-    const globalFriction   = buildTopicFriction(globalAttempts, globalTopicWAProblems);
-    const practiceFriction = buildTopicFriction(practiceAttempts, practiceTopicWAProblems);
 
     const categoryRawProblems = {};
     CATEGORIES.forEach(c => {
       categoryRawProblems[c] = Array.from((categoryRawWAMap[c]||new Map()).values()).filter(p => totalErrors(p) > 0);
     });
-    const globalRawProblems   = Array.from(globalRawWAMap.values()).filter(p => totalErrors(p) > 0);
     const practiceRawProblems = Array.from(practiceRawWAMap.values()).filter(p => totalErrors(p) > 0);
 
     return {
       categoryIndexTimes, categoryIndexAttempts, categoryIndexSolved,
-      contestFriction, globalFriction, practiceFriction,
-      categoryRawProblems, globalRawProblems, practiceRawProblems,
+      categoryRawProblems, practiceRawProblems,
       participatedCount: participated.size,
       categoryContestCount: Object.fromEntries(Object.entries(categoryContestCount).map(([c, s]) => [c, s.size]))
     };
@@ -824,457 +779,422 @@
   const MAX_VISIBLE_TAGS = 3;
   function buildTagChips(tags, isDark, muted) {
     const tw = document.createElement("span");
-    tw.style.cssText = [
-      "display:flex", "gap:3px", "flex-wrap:nowrap",
-      "flex-shrink:0", "align-items:center"
-    ].join(";");
-    const visible = tags.slice(0, MAX_VISIBLE_TAGS);
-    const hidden  = tags.length - visible.length;
+    tw.style.cssText = "display:flex;gap:3px;flex-wrap:nowrap;flex-shrink:0;align-items:center;";
+    const visible = tags.slice(0, MAX_VISIBLE_TAGS), hidden = tags.length - visible.length;
     visible.forEach(tag => {
       const chip = document.createElement("span");
       chip.textContent = tag;
-      chip.style.cssText = [
-        `background:${isDark ? "#2a3a4a" : "#e8f0fe"}`,
-        `color:${isDark ? "#8ab4f8" : "#1a56c4"}`,
-        "font-size:10px", "border-radius:3px", "padding:1px 5px",
-        "white-space:nowrap", "flex-shrink:0"
-      ].join(";");
+      chip.style.cssText = [`background:${isDark ? "#1e2e40" : "#e8f0fe"}`, `color:${isDark ? "#7aabff" : "#1a56c4"}`, "font-size:10px", "border-radius:3px", "padding:1px 5px", "white-space:nowrap", "flex-shrink:0"].join(";");
       tw.appendChild(chip);
     });
     if (hidden > 0) {
       const more = document.createElement("span");
-      more.textContent = `+${hidden}`;
-      more.title = tags.slice(MAX_VISIBLE_TAGS).join(", ");
-      more.style.cssText = [
-        `background:${isDark ? "#3a3a3a" : "#eee"}`,
-        `color:${muted}`,
-        "font-size:10px", "border-radius:3px", "padding:1px 5px",
-        "white-space:nowrap", "flex-shrink:0", "cursor:default"
-      ].join(";");
+      more.textContent = `+${hidden}`; more.title = tags.slice(MAX_VISIBLE_TAGS).join(", ");
+      more.style.cssText = [`background:${isDark ? "#2e2e2e" : "#eee"}`, `color:${muted}`, "font-size:10px", "border-radius:3px", "padding:1px 5px", "white-space:nowrap", "flex-shrink:0", "cursor:default"].join(";");
       tw.appendChild(more);
     }
     return tw;
   }
 
-  function makeWAProblemDropdown(waProblems, shouldHideAC, minAttempts) {
-    const dropdown = document.createElement("div");
-    dropdown.style.cssText = [
-      `background:${theme.dropdownBg}`, `border:1px solid ${theme.dropdownBorder}`,
-      "border-radius:5px", "margin:4px 8px 6px 8px", "overflow:hidden",
-      "animation:cfpm-slide-down 0.18s ease"
-    ].join(";");
-
-    if (!document.getElementById("cfpm-anim")) {
-      const style = document.createElement("style"); style.id = "cfpm-anim";
-      style.textContent = `@keyframes cfpm-slide-down{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}`;
-      document.head.appendChild(style);
-    }
-
-    const sorted = (waProblems||[])
-      .filter(p => totalErrors(p) >= minAttempts)
-      .filter(p => !shouldHideAC || !p.solved)
-      .slice().sort((a,b) => totalErrors(b)-totalErrors(a));
-
-    if (!sorted.length) {
-      const empty = document.createElement("div");
-      empty.style.cssText = `padding:8px 12px;color:${theme.emptyText};font-style:italic;font-size:12px;`;
-      empty.textContent = shouldHideAC ? "All problems have been AC'd." : "No problems recorded.";
-      dropdown.appendChild(empty); return dropdown;
-    }
-
-    const isDark = detectDarkMode();
-    const tleBg = isDark?"#2a2000":"#fff8e1", tleFg = isDark?"#ffd54f":"#e65100";
-    const rteBg = isDark?"#1a1a2e":"#ede7f6", rteFg = isDark?"#9fa8da":"#4527a0";
-    const mleBg = isDark?"#002828":"#e0f2f1", mleFg = isDark?"#4db6ac":"#00695c";
-    const errBg = isDark?"#2a2a2a":"#f5f5f5";
-
-    sorted.forEach((p, i) => {
-      const row = document.createElement("div");
-      row.style.cssText = [
-        "display:flex", "align-items:center", "gap:6px", "padding:6px 12px",
-        i > 0 ? `border-top:1px solid ${theme.dropdownBorder}` : "",
-        "transition:background 0.12s", "cursor:pointer", "min-width:0"
-      ].join(";");
-      row.onmouseenter = () => row.style.background = theme.problemRowHover;
-      row.onmouseleave = () => row.style.background = "";
-
-      const link = document.createElement("a");
-      link.href = `https://codeforces.com/contest/${p.contestId}/problem/${p.index}`;
-      link.target = "_blank"; link.rel = "noopener";
-      link.style.cssText = [
-        `color:${theme.problemLink}`, "text-decoration:none", "font-size:12px",
-        "font-weight:600", "flex:0 0 auto", "min-width:110px", "max-width:180px",
-        "overflow:hidden", "text-overflow:ellipsis", "white-space:nowrap"
-      ].join(";");
-      link.textContent = `${p.index}. ${p.name}`; link.title = p.name;
-      link.onmouseenter = () => link.style.textDecoration = "underline";
-      link.onmouseleave = () => link.style.textDecoration = "none";
-      link.addEventListener("click", e => e.stopPropagation());
-      row.appendChild(link);
-
-      const spacer = document.createElement("span");
-      spacer.style.cssText = "flex:1 1 0;min-width:8px;";
-      row.appendChild(spacer);
-
-      if (p.tags && p.tags.length > 0) {
-        row.appendChild(buildTagChips(p.tags, isDark, theme.muted));
-      }
-
-      const cs = document.createElement("span");
-      cs.style.cssText = `color:${theme.muted};font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:1;min-width:0;max-width:180px;`;
-      cs.textContent = p.contestName; cs.title = p.contestName;
-      row.appendChild(cs);
-
-      if (p.rating) {
-        const rb = document.createElement("span");
-        rb.style.cssText = `font-size:11px;color:${theme.muted};white-space:nowrap;flex-shrink:0;`;
-        rb.textContent = "★" + p.rating; row.appendChild(rb);
-      }
-
-      [
-        { key:"wa",    label:"WA",  bg:theme.waBadge,  fg:theme.waBadgeText },
-        { key:"tle",   label:"TLE", bg:tleBg,           fg:tleFg },
-        { key:"rte",   label:"RTE", bg:rteBg,           fg:rteFg },
-        { key:"mle",   label:"MLE", bg:mleBg,           fg:mleFg },
-        { key:"other", label:"ERR", bg:errBg,           fg:theme.muted },
-      ].forEach(({ key, label, bg, fg }) => {
-        const cnt = p[key]||0; if (!cnt) return;
-        const badge = document.createElement("span");
-        badge.style.cssText = [
-          `background:${bg}`, `color:${fg}`, "font-size:11px", "font-weight:700",
-          "border-radius:4px", "padding:1px 6px", "white-space:nowrap", "flex-shrink:0"
-        ].join(";");
-        badge.textContent = `${label} ×${cnt}`; row.appendChild(badge);
-      });
-
-      const sb = document.createElement("span");
-      if (p.solved) {
-        sb.style.cssText = `background:${theme.solvedBadge};color:${theme.solvedBadgeText};font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;white-space:nowrap;flex-shrink:0;`;
-        sb.textContent = "✓ AC'd";
-      } else {
-        sb.style.cssText = `background:${theme.waBadge};color:${theme.waBadgeText};font-size:11px;border-radius:4px;padding:1px 6px;white-space:nowrap;flex-shrink:0;opacity:0.75;`;
-        sb.textContent = "Unsolved";
-      }
-      row.appendChild(sb);
-      row.addEventListener("click", () => window.open(`https://codeforces.com/contest/${p.contestId}/problem/${p.index}`, "_blank"));
-      dropdown.appendChild(row);
-    });
-    return dropdown;
-  }
-
+  // ── MAIN FRICTION PANELS RENDERER ──
   function renderFrictionPanels(modeData, cat) {
     frictionScrollBox.innerHTML = "";
 
-    const contestList  = modeData.contestFriction  || [];
-    const globalList   = modeData.globalFriction   || [];
-    const practiceList = modeData.practiceFriction || [];
+    let activeTab        = frictionActiveTab;
+    let sortMode         = defaultSortMode;
+    let localHideAC      = hideAC;
+    let localMinAttempts = minAttemptsGlobal;
+    let localTagFilters  = new Set(activeTagFilters);
 
-    let activeTab = frictionActiveTab;
-    let sortMode = defaultSortMode;
-    let localHideAC = hideAC, localMinAttempts = minAttemptsGlobal;
-    let localPracticeOnly = false;
+    let availableTags = [];
+    let filterOpen = false, sortOpen = false;
 
-    function waColor(r) { return r < 40 ? "#27ae60" : r < 70 ? "#e67e22" : "#e74c3c"; }
+    function getProblems() {
+      return activeTab === "category"
+        ? (modeData.categoryRawProblems?.[cat] || [])
+        : (modeData.practiceRawProblems || []);
+    }
 
+    function applyFilters(problems) {
+      return problems
+        .filter(p => totalErrors(p) >= localMinAttempts)
+        .filter(p => !localHideAC || !p.solved)
+        .filter(p => localTagFilters.size === 0 || (p.tags || []).some(t => localTagFilters.has(t)));
+    }
+
+    function getAllTags(problems) {
+      const tagSet = new Set();
+      problems.forEach(p => (p.tags || []).forEach(t => tagSet.add(t)));
+      return Array.from(tagSet).sort();
+    }
+
+    // ── TOP BAR ──
     const topBar = document.createElement("div");
     topBar.style.cssText = [
-      "display:flex", "align-items:stretch", "justify-content:space-between",
-      `border-bottom:1px solid ${theme.borderLight}`, "min-height:38px"
+      "display:flex", "align-items:center", "justify-content:space-between",
+      `border-bottom:1px solid ${theme.borderLight}`, "min-height:42px",
+      "padding:0 10px 0 12px", "flex-shrink:0", "gap:8px"
     ].join(";");
 
-    const tabsWrap = document.createElement("div");
-    tabsWrap.style.cssText = "display:flex;align-items:stretch;";
+    // ── SEGMENTED SOURCE CONTROL ──
+    const segWrap = document.createElement("div");
+    segWrap.style.cssText = `display:flex;align-items:center;background:${theme.borderLighter};border-radius:5px;padding:3px;gap:2px;flex-shrink:0;`;
 
-    function countProblems(src) {
-      return src.filter(p => totalErrors(p) >= localMinAttempts && (!localHideAC || !p.solved)).length;
-    }
-    function countTopics(items) {
-      return items.filter(x => (x.waProblems||[]).some(p => totalErrors(p) >= localMinAttempts && (!localHideAC || !p.solved))).length;
-    }
+    const srcContestBtn  = document.createElement("button");
+    const srcPracticeBtn = document.createElement("button");
+    srcContestBtn.dataset.key  = "category";
+    srcPracticeBtn.dataset.key = "practice";
 
-    function getCatCount()     { return frictionView === "problems" ? countProblems(modeData.categoryRawProblems?.[cat] || []) : countTopics(contestList); }
-    function getOverallCount() {
-      if (frictionView === "problems") return countProblems(localPracticeOnly ? (modeData.practiceRawProblems||[]) : (modeData.globalRawProblems||[]));
-      return countTopics(localPracticeOnly ? practiceList : globalList);
-    }
+    const srcContestCount  = document.createElement("span");
+    const srcPracticeCount = document.createElement("span");
 
-    function makeTab(labelText, key) {
-      const t = document.createElement("button"); t.dataset.key = key;
-      const labelSpan = document.createElement("span"); labelSpan.textContent = labelText;
-      const badge = document.createElement("span");
-      badge.style.cssText = [
-        "margin-left:5px", "font-size:10px", "font-weight:700", "border-radius:10px",
-        "padding:1px 6px", `background:${theme.borderLight}`, `color:${theme.muted}`
-      ].join(";");
-      t.appendChild(labelSpan); t.appendChild(badge);
-      t.style.cssText = [
-        "display:flex", "align-items:center", "padding:8px 16px", "font-size:13px",
-        "font-weight:600", "border:none", "border-bottom:2px solid transparent",
-        "background:transparent", "cursor:pointer", `color:${theme.muted}`,
-        "transition:color 0.15s,border-color 0.15s", "margin-bottom:-1px"
-      ].join(";");
-      t.addEventListener("click", () => {
-        activeTab = key; frictionActiveTab = key;
-        updateTabStyles(); renderTabContent();
-      });
-      return { el: t, badge };
+    function badgeCountStyle(active) {
+      return `font-size:10px;font-weight:700;border-radius:9px;padding:0 5px;min-width:16px;text-align:center;display:inline-block;background:${active ? "rgba(255,255,255,0.22)" : (detectDarkMode() ? "#3a3a3a" : "#d8d8d8")};color:${active ? "#fff" : theme.muted};`;
     }
 
-    const { el: tabCatEl, badge: tabCatBadge }         = makeTab(cat, "category");
-    const { el: tabOverallEl, badge: tabOverallBadge } = makeTab("Overall", "overall");
-    tabsWrap.appendChild(tabCatEl); tabsWrap.appendChild(tabOverallEl);
-
-    function updateTabBadges() {
-      tabCatBadge.textContent     = getCatCount();
-      tabOverallBadge.textContent = getOverallCount();
-    }
-    updateTabBadges();
-
-    function updateTabStyles() {
-      [tabCatEl, tabOverallEl].forEach(t => {
-        const active = t.dataset.key === activeTab;
-        t.style.color       = active ? theme.text : theme.muted;
-        t.style.borderColor = active ? theme.activeButtonBg : "transparent";
-      });
-    }
-    updateTabStyles();
-
-    const rightBtns = document.createElement("div");
-    rightBtns.style.cssText = "display:flex;align-items:center;gap:8px;padding:0 10px;flex-shrink:0;";
-
-    const sortToggle = document.createElement("div");
-    sortToggle.style.cssText = ["display:flex","border-radius:6px","overflow:hidden",`border:1px solid ${theme.buttonBorder}`].join(";");
-
-    const sortOpts = frictionView === "problems"
-      ? [{ label: "Errors", mode: "errors" }, { label: "Rating", mode: "rating" }]
-      : [{ label: "WA%",    mode: "wa"     }, { label: "Attempts", mode: "attempts" }];
-
-    if (frictionView === "problems" && (sortMode === "wa" || sortMode === "attempts")) sortMode = "errors";
-    if (frictionView === "topics"   && (sortMode === "errors" || sortMode === "rating")) sortMode = "wa";
-
-    const sortBtns = sortOpts.map(({ label, mode }) => {
-      const b = document.createElement("button");
-      b.textContent = label;
-      b.style.cssText = [
-        "padding:5px 12px", "font-size:12px", "font-weight:600", "border:none",
-        "cursor:pointer", "transition:background 0.15s,color 0.15s", "white-space:nowrap"
-      ].join(";");
-      b.addEventListener("click", () => { sortMode = mode; defaultSortMode = mode; updateSortStyles(); renderTabContent(); autoSave(); });
-      sortToggle.appendChild(b);
-      return { b, mode };
-    });
-
-    function updateSortStyles() {
-      sortBtns.forEach(({ b, mode }) => {
-        b.style.background = sortMode === mode ? theme.activeButtonBg : theme.buttonBg;
-        b.style.color      = sortMode === mode ? theme.activeButtonText : theme.buttonText;
-      });
-    }
-    updateSortStyles();
-
-    const minWAWrap = document.createElement("div");
-    minWAWrap.style.cssText = "display:flex;align-items:center;gap:4px;flex-shrink:0;";
-    const minWALabel = document.createElement("span");
-    minWALabel.textContent = "Min WA:";
-    minWALabel.style.cssText = `font-size:12px;font-weight:600;color:${theme.muted};white-space:nowrap;`;
-    const minWAInput = document.createElement("input");
-    minWAInput.type = "number"; minWAInput.min = "1"; minWAInput.max = "99"; minWAInput.value = String(localMinAttempts);
-    minWAInput.style.cssText = [
-      "width:44px", "padding:4px 6px", "border-radius:5px",
-      `border:1px solid ${theme.inputBorder}`, `background:${theme.inputBg}`,
-      `color:${theme.inputText}`, "font-size:12px", "font-weight:600",
-      "text-align:center", "-moz-appearance:textfield"
-    ].join(";");
-    minWAInput.addEventListener("input", () => {
-      const v = parseInt(minWAInput.value);
-      if (v >= 1) { localMinAttempts = v; minAttemptsGlobal = v; updateTabBadges(); renderTabContent(); autoSave(); }
-    });
-    minWAWrap.appendChild(minWALabel); minWAWrap.appendChild(minWAInput);
-
-    const hideACBtn = document.createElement("button");
-    hideACBtn.style.cssText = [
-      "padding:5px 12px", "font-size:12px", "font-weight:600", "border-radius:6px",
-      `border:1px solid ${theme.buttonBorder}`, "cursor:pointer",
-      "transition:background 0.15s,color 0.15s,border-color 0.15s", "white-space:nowrap"
-    ].join(";");
-    function updateHideACBtn() {
-      hideACBtn.textContent       = localHideAC ? "Show AC'd" : "Hide AC'd";
-      hideACBtn.style.background  = localHideAC ? theme.activeButtonBg : theme.buttonBg;
-      hideACBtn.style.color       = localHideAC ? theme.activeButtonText : theme.buttonText;
-      hideACBtn.style.borderColor = localHideAC ? theme.activeButtonBg : theme.buttonBorder;
-    }
-    updateHideACBtn();
-    hideACBtn.addEventListener("click", () => {
-      localHideAC = !localHideAC; hideAC = localHideAC;
-      updateHideACBtn(); updateTabBadges(); renderTabContent(); autoSave();
-    });
-
-    const practiceBtn = document.createElement("button");
-    practiceBtn.style.cssText = [
-      "padding:5px 12px", "font-size:12px", "font-weight:600", "border-radius:6px",
-      `border:1px solid ${theme.buttonBorder}`, "cursor:pointer",
-      "transition:background 0.15s,color 0.15s,border-color 0.15s",
-      "white-space:nowrap", "display:none"
-    ].join(";");
-    function updatePracticeBtn() {
-      practiceBtn.textContent       = localPracticeOnly ? "All" : "Practice Only";
-      practiceBtn.style.background  = localPracticeOnly ? theme.activeButtonBg : theme.buttonBg;
-      practiceBtn.style.color       = localPracticeOnly ? theme.activeButtonText : theme.buttonText;
-      practiceBtn.style.borderColor = localPracticeOnly ? theme.activeButtonBg : theme.buttonBorder;
-    }
-    updatePracticeBtn();
-    practiceBtn.addEventListener("click", () => {
-      localPracticeOnly = !localPracticeOnly;
-      updatePracticeBtn(); updateTabBadges(); renderTabContent();
-    });
-
-    rightBtns.appendChild(sortToggle);
-    rightBtns.appendChild(minWAWrap);
-    rightBtns.appendChild(hideACBtn);
-    rightBtns.appendChild(practiceBtn);
-
-    topBar.appendChild(tabsWrap);
-    topBar.appendChild(rightBtns);
-
-    const listArea = document.createElement("div");
-    listArea.style.cssText = "flex:1;overflow-y:auto;";
-
-    function makeTopicList(items) {
-      const wrap = document.createElement("div");
-      wrap.style.cssText = "display:flex;flex-direction:column;";
-
-      const filtered = items.filter(x =>
-        (x.waProblems||[]).some(p => totalErrors(p) >= localMinAttempts && (!localHideAC || !p.solved))
-      );
-      if (!filtered.length) {
-        const empty = document.createElement("div");
-        empty.style.cssText = `padding:16px 12px;color:${theme.emptyText};font-style:italic;font-size:13px;text-align:center;`;
-        empty.textContent = "No data"; wrap.appendChild(empty); return wrap;
-      }
-
-      const sorted = filtered.slice().sort((a, b) =>
-        sortMode === "attempts" ? b.attempts - a.attempts : b.waRatio - a.waRatio
-      );
-      let openDropdown = null, openRowEl = null;
-      const chevronMap = new WeakMap();
-
-      sorted.forEach(t => {
-        const rowWrap = document.createElement("div");
-        const row = document.createElement("div");
-        row.style.cssText = [
-          "display:flex", "align-items:center", "gap:12px", "padding:9px 16px",
-          `border-bottom:1px solid ${theme.borderLighter}`,
-          "cursor:pointer", "transition:background 0.1s", "border-left:3px solid transparent"
+    function updateSourceBtns() {
+      [srcContestBtn, srcPracticeBtn].forEach(btn => {
+        const active = btn.dataset.key === activeTab;
+        btn.style.cssText = [
+          `background:${active ? theme.btnActiveBg : "transparent"}`,
+          `color:${active ? "#fff" : theme.muted}`,
+          "border:none", "outline:none", "cursor:pointer",
+          "height:26px", "padding:0 11px", "border-radius:3px",
+          "font-size:11px", "font-weight:600",
+          "display:inline-flex", "align-items:center", "gap:6px", "white-space:nowrap"
         ].join(";");
-        const c = waColor(t.waRatio);
-        row.style.borderLeftColor = c;
-        row.onmouseenter = () => { if (openRowEl !== row) row.style.background = theme.problemRowHover; };
-        row.onmouseleave = () => { if (openRowEl !== row) row.style.background = ""; };
+        const badge = btn.dataset.key === "category" ? srcContestCount : srcPracticeCount;
+        badge.style.cssText = badgeCountStyle(active);
+      });
+    }
 
-        const chevron = document.createElement("span");
-        chevron.textContent = "▶";
-        chevron.style.cssText = `font-size:8px;color:${theme.muted};transition:transform 0.18s;flex-shrink:0;`;
+    function updateSourceCounts() {
+      const contestProblems  = modeData.categoryRawProblems?.[cat] || [];
+      const practiceProblems = modeData.practiceRawProblems || [];
+      srcContestCount.textContent  = String(applyFilters(contestProblems).length);
+      srcPracticeCount.textContent = String(applyFilters(practiceProblems).length);
+    }
 
-        const name = document.createElement("span");
-        name.style.cssText = `font-size:13px;font-weight:500;color:${theme.weakTopicName};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`;
-        name.textContent = t.topic;
+    srcContestBtn.appendChild(document.createTextNode("In-contest"));
+    srcContestBtn.appendChild(srcContestCount);
+    srcPracticeBtn.appendChild(document.createTextNode("Practice"));
+    srcPracticeBtn.appendChild(srcPracticeCount);
 
-        const attSpan = document.createElement("span");
-        attSpan.style.cssText = `font-size:12px;color:${theme.muted};white-space:nowrap;flex-shrink:0;`;
-        const filteredProblems = (t.waProblems||[]).filter(p => totalErrors(p) >= localMinAttempts);
-        const visibleProblems  = filteredProblems.filter(p => !localHideAC || !p.solved);
-        const visibleAttempts  = visibleProblems.reduce((sum, p) => sum + totalErrors(p), 0);
-        attSpan.appendChild(document.createTextNode(`${visibleAttempts} attempt${visibleAttempts !== 1 ? "s" : ""}`));
-        const unsolved = visibleProblems.filter(p => !p.solved).length;
-        if (unsolved > 0) {
-          attSpan.appendChild(document.createTextNode(" · "));
-          const b = document.createElement("span");
-          b.style.cssText = `color:${theme.waBadgeText};font-weight:600;`;
-          b.textContent = `${unsolved} unsolved`; attSpan.appendChild(b);
-        } else if (localHideAC) {
-          attSpan.appendChild(document.createTextNode(" · "));
-          const b = document.createElement("span");
-          b.style.cssText = `color:${theme.solvedBadgeText};font-weight:600;`;
-          b.textContent = "all AC'd"; attSpan.appendChild(b);
+    segWrap.appendChild(srcContestBtn);
+    segWrap.appendChild(srcPracticeBtn);
+
+    updateSourceBtns();
+    updateSourceCounts();
+
+    srcContestBtn.addEventListener("click", () => {
+      activeTab = "category"; frictionActiveTab = "category";
+      updateSourceBtns(); refreshAvailableTags(); renderList();
+    });
+    srcPracticeBtn.addEventListener("click", () => {
+      activeTab = "practice"; frictionActiveTab = "practice";
+      updateSourceBtns(); refreshAvailableTags(); renderList();
+    });
+
+    // ── RIGHT CONTROLS ──
+    const rightBtns = document.createElement("div");
+    rightBtns.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0;";
+
+    // Filter button + dropdown
+    const filterBtnWrap = document.createElement("div");
+    filterBtnWrap.style.cssText = "position:relative;display:flex;align-items:center;";
+
+    const filterIconBtn = document.createElement("button");
+    filterIconBtn.className = "cfpm-icon-btn";
+    filterIconBtn.title = "Filter";
+    filterIconBtn.style.cssText = `background:${theme.btnBg};border:1px solid ${theme.btnBorder};color:${theme.muted};`;
+    filterIconBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 4h12M4 8h8M6 12h4"/></svg>`;
+
+    const filterDd = document.createElement("div");
+    filterDd.id = "cfpm-filter-dd";
+    filterDd.style.cssText = `background:${theme.dropdownBg};border:1px solid ${theme.dropdownBorder};display:none;`;
+
+    // Min attempts section
+    const minAttSection = document.createElement("div");
+    minAttSection.style.cssText = `padding:14px;border-bottom:1px solid ${theme.dropdownBorder};`;
+
+    const minAttLabel = document.createElement("div");
+    minAttLabel.textContent = "Min. wrong attempts";
+    minAttLabel.style.cssText = `font-size:11px;font-weight:600;color:${theme.mutedStrong};margin-bottom:10px;`;
+
+    const minAttRow = document.createElement("div");
+    minAttRow.style.cssText = "display:flex;align-items:center;gap:8px;";
+
+    const minAttDec = document.createElement("button");
+    minAttDec.className = "cfpm-step-btn";
+    minAttDec.innerHTML = `<svg width="10" height="2" viewBox="0 0 10 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="0" y1="1" x2="10" y2="1"/></svg>`;
+    minAttDec.style.cssText = `background:${theme.btnBg};border:1px solid ${theme.btnBorder};color:${theme.text};`;
+
+    const minAttVal = document.createElement("span");
+    minAttVal.style.cssText = `display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:28px;font-size:15px;font-weight:700;color:${theme.text};border-radius:5px;background:${theme.inputBg};border:1px solid ${theme.btnBorder};`;
+    minAttVal.textContent = String(localMinAttempts);
+
+    const minAttInc = document.createElement("button");
+    minAttInc.className = "cfpm-step-btn";
+    minAttInc.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="0" x2="5" y2="10"/><line x1="0" y1="5" x2="10" y2="5"/></svg>`;
+    minAttInc.style.cssText = `background:${theme.btnBg};border:1px solid ${theme.btnBorder};color:${theme.text};`;
+
+    const minAttNote = document.createElement("span");
+    minAttNote.style.cssText = `font-size:11px;color:${theme.muted};`;
+    minAttNote.textContent = "or more failures";
+
+    minAttRow.appendChild(minAttDec);
+    minAttRow.appendChild(minAttVal);
+    minAttRow.appendChild(minAttInc);
+    minAttRow.appendChild(minAttNote);
+    minAttSection.appendChild(minAttLabel);
+    minAttSection.appendChild(minAttRow);
+
+    // Topic filter header
+    const topicHeader = document.createElement("div");
+    topicHeader.style.cssText = `display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px 14px;background:${theme.dropdownSection};border-bottom:1px solid ${theme.dropdownBorder};`;
+
+    const topicLabel = document.createElement("span");
+    topicLabel.textContent = "Filter by topic";
+    topicLabel.style.cssText = `font-size:11px;font-weight:600;color:${theme.mutedStrong};`;
+
+    const topicClearBtn = document.createElement("span");
+    topicClearBtn.textContent = "Clear all";
+    topicClearBtn.style.cssText = `font-size:11px;color:${theme.btnActiveBg};cursor:pointer;font-weight:600;display:none;`;
+    topicClearBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      localTagFilters.clear(); activeTagFilters.clear();
+      updateFilterBtnStyle(); renderTagPills(); renderTagListOnly(); updateSourceCounts(); renderList(); autoSave();
+    });
+
+    topicHeader.appendChild(topicLabel);
+    topicHeader.appendChild(topicClearBtn);
+
+    const tagListEl = document.createElement("div");
+    tagListEl.id = "cfpm-tag-list";
+
+    filterDd.appendChild(minAttSection);
+    filterDd.appendChild(topicHeader);
+    filterDd.appendChild(tagListEl);
+    filterBtnWrap.appendChild(filterIconBtn);
+    filterBtnWrap.appendChild(filterDd);
+
+    // Sort button + dropdown
+    const sortBtnWrap = document.createElement("div");
+    sortBtnWrap.style.cssText = "position:relative;display:flex;align-items:center;";
+
+    const sortIconBtn = document.createElement("button");
+    sortIconBtn.className = "cfpm-icon-btn";
+    sortIconBtn.title = sortMode === "rating" ? "Sort: by rating" : "Sort: by errors";
+    sortIconBtn.style.cssText = `background:${theme.btnBg};border:1px solid ${theme.btnBorder};color:${theme.muted};`;
+    sortIconBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v10M5 13l-2-2M5 13l2-2M11 13V3M11 3l-2 2M11 3l2 2"/></svg>`;
+
+    const sortDd = document.createElement("div");
+    sortDd.id = "cfpm-sort-dd";
+    sortDd.style.cssText = `background:${theme.dropdownBg};border:1px solid ${theme.dropdownBorder};display:none;`;
+
+    const sortDdLabel = document.createElement("div");
+    sortDdLabel.textContent = "Sort by";
+    sortDdLabel.style.cssText = `padding:10px 14px 8px 14px;font-size:11px;font-weight:600;color:${theme.mutedStrong};border-bottom:1px solid ${theme.dropdownBorder};background:${theme.dropdownSection};`;
+    sortDd.appendChild(sortDdLabel);
+
+    const sortOptions = [
+      { key: "errors", label: "Wrong attempts", desc: "Most errors first" },
+      { key: "rating", label: "Rating",          desc: "Highest rated first" },
+    ];
+
+    function buildSortOptions() {
+      while (sortDd.children.length > 1) sortDd.removeChild(sortDd.lastChild);
+      sortOptions.forEach(({ key, label, desc }) => {
+        const opt = document.createElement("div");
+        opt.className = "cfpm-sort-opt";
+        const isActive = sortMode === key;
+        opt.style.cssText = [`background:${isActive ? (detectDarkMode() ? "#16244a" : "#f0f5ff") : "transparent"}`, `color:${theme.text}`].join(";");
+
+        const leftCol = document.createElement("div");
+        leftCol.style.cssText = "display:flex;flex-direction:column;gap:2px;flex:1;";
+        const lblEl = document.createElement("div");
+        lblEl.style.cssText = `font-size:12px;font-weight:${isActive ? "700" : "600"};color:${isActive ? theme.btnActiveBg : theme.text};`;
+        lblEl.textContent = label;
+        const descEl = document.createElement("div");
+        descEl.textContent = desc; descEl.style.cssText = `font-size:11px;color:${theme.muted};`;
+        leftCol.appendChild(lblEl); leftCol.appendChild(descEl);
+        opt.appendChild(leftCol);
+
+        if (isActive) {
+          const checkEl = document.createElement("span");
+          checkEl.textContent = "✓";
+          checkEl.style.cssText = `color:${theme.btnActiveBg};font-size:13px;font-weight:700;flex-shrink:0;`;
+          opt.appendChild(checkEl);
         }
 
-        const pct = document.createElement("span");
-        pct.style.cssText = [
-          `color:${c}`, "font-size:13px", "font-weight:700",
-          "white-space:nowrap", "flex-shrink:0", "min-width:42px", "text-align:right"
-        ].join(";");
-        pct.textContent = `${t.waRatio}%`;
-
-        row.appendChild(chevron); row.appendChild(name); row.appendChild(attSpan); row.appendChild(pct);
-        rowWrap.appendChild(row); wrap.appendChild(rowWrap);
-
-        row.addEventListener("click", () => {
-          if (openDropdown && openDropdown.parentNode === rowWrap) {
-            openDropdown.remove(); openDropdown = null;
-            chevron.style.transform = ""; row.style.background = "";
-            row.style.borderLeftColor = c; openRowEl = null; return;
-          }
-          if (openDropdown) {
-            openDropdown.remove();
-            if (openRowEl) { openRowEl.style.background = ""; const oc = chevronMap.get(openRowEl); if (oc) oc.style.transform = ""; }
-          }
-          const dd = makeWAProblemDropdown(t.waProblems||[], localHideAC, localMinAttempts);
-          rowWrap.appendChild(dd);
-          openDropdown = dd; openRowEl = row; chevronMap.set(row, chevron);
-          chevron.style.transform = "rotate(90deg)"; row.style.background = theme.problemRowHover;
+        opt.addEventListener("click", (e) => {
+          e.stopPropagation();
+          sortMode = key; defaultSortMode = key;
+          sortIconBtn.title = key === "rating" ? "Sort: by rating" : "Sort: by errors";
+          closeSortDd(); renderList(); autoSave();
         });
+        sortDd.appendChild(opt);
       });
-      return wrap;
     }
 
-    function makeProblemList(problems) {
-      const wrap = document.createElement("div");
-      wrap.style.cssText = "display:flex;flex-direction:column;";
+    sortBtnWrap.appendChild(sortIconBtn);
+    sortBtnWrap.appendChild(sortDd);
 
-      const filtered = problems.filter(p =>
-        totalErrors(p) >= localMinAttempts && (!localHideAC || !p.solved)
-      );
-      if (!filtered.length) {
+    const divider = document.createElement("span");
+    divider.style.cssText = `display:inline-block;width:1px;height:18px;background:${theme.borderLight};flex-shrink:0;`;
+
+    // Hide AC button
+    const hideACBtn = document.createElement("button");
+    hideACBtn.className = "cfpm-pill-btn";
+
+    function updateHideACBtn() {
+      hideACBtn.textContent = localHideAC ? "Unsolved only" : "All problems";
+      hideACBtn.style.cssText = [
+        `background:${localHideAC ? theme.btnActiveBg : theme.btnBg}`,
+        `color:${localHideAC ? theme.btnActiveText : theme.btnText}`,
+        `border:1px solid ${localHideAC ? theme.btnActiveBorder : theme.btnBorder}`,
+      ].join(";");
+    }
+    updateHideACBtn();
+
+    rightBtns.appendChild(filterBtnWrap);
+    rightBtns.appendChild(sortBtnWrap);
+    rightBtns.appendChild(divider);
+    rightBtns.appendChild(hideACBtn);
+    topBar.appendChild(segWrap);
+    topBar.appendChild(rightBtns);
+
+    // ── ACTIVE TAG PILLS ROW ──
+    const tagPillRow = document.createElement("div");
+    tagPillRow.style.cssText = [
+      "display:none", "align-items:center", "padding:5px 12px",
+      `border-bottom:1px solid ${theme.borderLighter}`,
+      "min-height:32px", "gap:5px", "flex-wrap:wrap", "flex-shrink:0"
+    ].join(";");
+
+    function renderTagPills() {
+      tagPillRow.innerHTML = "";
+      tagPillRow.style.display = localTagFilters.size > 0 ? "flex" : "none";
+      topicClearBtn.style.display = localTagFilters.size > 0 ? "inline" : "none";
+      if (!localTagFilters.size) return;
+      localTagFilters.forEach(tag => {
+        const pill = document.createElement("span");
+        pill.className = "cfpm-tag-pill";
+        pill.style.cssText = [`background:${detectDarkMode() ? "#16244a" : "#dbeafe"}`, `color:${detectDarkMode() ? "#93c5fd" : "#1e40af"}`, `border:1px solid ${detectDarkMode() ? "#2d5ba6" : "#93c5fd"}`].join(";");
+        const tagText = document.createElement("span"); tagText.textContent = tag;
+        const closeX = document.createElement("span"); closeX.textContent = "✕"; closeX.style.cssText = "opacity:0.5;font-size:9px;margin-left:1px;";
+        pill.appendChild(tagText); pill.appendChild(closeX);
+        pill.title = `Remove: ${tag}`;
+        pill.addEventListener("click", () => {
+          localTagFilters.delete(tag); activeTagFilters = new Set(localTagFilters);
+          updateFilterBtnStyle(); renderTagPills(); renderTagListOnly(); updateSourceCounts(); renderList(); autoSave();
+        });
+        tagPillRow.appendChild(pill);
+      });
+    }
+
+    // ── PROBLEM LIST ──
+    const listArea = document.createElement("div");
+    listArea.style.cssText = "flex:1;overflow-y:auto;min-height:0;";
+
+    function getFilterTitle() {
+      const parts = [];
+      if (localMinAttempts > 1) parts.push(`Min ${localMinAttempts}`);
+      if (localTagFilters.size > 0) parts.push(`${localTagFilters.size} topic${localTagFilters.size > 1 ? "s" : ""}`);
+      return parts.length ? `Filters active: ${parts.join(", ")}` : "Filter";
+    }
+
+    function updateFilterBtnStyle() {
+      const hasFilter = localTagFilters.size > 0 || localMinAttempts > 1;
+      filterIconBtn.style.background  = hasFilter ? theme.btnActiveBg : theme.btnBg;
+      filterIconBtn.style.color       = hasFilter ? theme.btnActiveText : theme.muted;
+      filterIconBtn.style.borderColor = hasFilter ? theme.btnActiveBorder : theme.btnBorder;
+      filterIconBtn.title = getFilterTitle();
+      topicClearBtn.style.display = localTagFilters.size > 0 ? "inline" : "none";
+    }
+    updateFilterBtnStyle();
+
+    function updateSortBtnStyle() {
+      const isCustom = sortMode !== "errors";
+      sortIconBtn.style.background  = isCustom ? theme.btnActiveBg : theme.btnBg;
+      sortIconBtn.style.color       = isCustom ? theme.btnActiveText : theme.muted;
+      sortIconBtn.style.borderColor = isCustom ? theme.btnActiveBorder : theme.btnBorder;
+      sortIconBtn.title = sortMode === "rating" ? "Sort: by rating" : "Sort: by errors";
+    }
+    updateSortBtnStyle();
+
+    function renderTagListOnly() {
+      tagListEl.innerHTML = "";
+      if (!availableTags.length) {
         const empty = document.createElement("div");
-        empty.style.cssText = `padding:16px 12px;color:${theme.emptyText};font-style:italic;font-size:13px;text-align:center;`;
-        empty.textContent = "No problems"; wrap.appendChild(empty); return wrap;
+        empty.style.cssText = `padding:14px;color:${theme.emptyText};font-size:12px;font-style:italic;text-align:center;`;
+        empty.textContent = "No topics available.";
+        tagListEl.appendChild(empty); return;
+      }
+      availableTags.forEach(tag => {
+        const isActive = localTagFilters.has(tag);
+        const row = document.createElement("div");
+        row.className = "cfpm-tag-opt";
+        row.style.cssText = [`background:${isActive ? (detectDarkMode() ? "#16244a" : "#eff6ff") : "transparent"}`, `color:${theme.text}`].join(";");
+
+        const check = document.createElement("span");
+        check.className = "cfpm-tag-check";
+        check.style.cssText = [`border:1.5px solid ${isActive ? theme.btnActiveBg : theme.btnBorder}`, `background:${isActive ? theme.btnActiveBg : "transparent"}`].join(";");
+        if (isActive) check.textContent = "✓";
+
+        const lbl = document.createElement("span");
+        lbl.textContent = tag;
+        lbl.style.cssText = `flex:1;word-break:break-word;line-height:1.4;font-weight:${isActive ? "600" : "400"};`;
+        row.appendChild(check); row.appendChild(lbl);
+
+        row.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (localTagFilters.has(tag)) localTagFilters.delete(tag); else localTagFilters.add(tag);
+          activeTagFilters = new Set(localTagFilters);
+          updateFilterBtnStyle(); renderTagListOnly(); renderTagPills(); updateSourceCounts(); renderList(); autoSave();
+        });
+        tagListEl.appendChild(row);
+      });
+    }
+
+    function refreshAvailableTags() {
+      const allProblems = getProblems();
+      availableTags = getAllTags(allProblems);
+      localTagFilters.forEach(t => { if (!availableTags.includes(t)) localTagFilters.delete(t); });
+      activeTagFilters = new Set(localTagFilters);
+      renderTagListOnly(); renderTagPills();
+    }
+
+    function renderList() {
+      listArea.innerHTML = "";
+      const problems = applyFilters(getProblems());
+      updateSourceCounts();
+
+      if (!problems.length) {
+        const empty = document.createElement("div");
+        empty.style.cssText = `padding:24px 14px;color:${theme.emptyText};font-style:italic;font-size:13px;text-align:center;`;
+        empty.textContent = localTagFilters.size > 0 ? "No problems match the selected topics." : "No problems with errors found.";
+        listArea.appendChild(empty); return;
       }
 
-      const sorted = filtered.slice().sort((a, b) =>
-        sortMode === "rating" ? (b.rating||0) - (a.rating||0) : totalErrors(b) - totalErrors(a)
+      const sorted = problems.slice().sort((a, b) =>
+        sortMode === "rating" ? (b.rating || 0) - (a.rating || 0) : totalErrors(b) - totalErrors(a)
       );
 
       const isDark = detectDarkMode();
-      const tleBg = isDark?"#2a2000":"#fff8e1", tleFg = isDark?"#ffd54f":"#e65100";
-      const rteBg = isDark?"#1a1a2e":"#ede7f6", rteFg = isDark?"#9fa8da":"#4527a0";
-      const mleBg = isDark?"#002828":"#e0f2f1", mleFg = isDark?"#4db6ac":"#00695c";
-      const errBg = isDark?"#2a2a2a":"#f5f5f5";
       const maxErr = totalErrors(sorted[0]) || 1;
 
       sorted.forEach((p, i) => {
         const row = document.createElement("div");
-        row.style.cssText = [
-          "display:flex", "align-items:center", "gap:6px", "padding:7px 14px",
-          i > 0 ? `border-top:1px solid ${theme.borderLighter}` : "",
-          "cursor:pointer", "transition:background 0.1s", "min-width:0"
-        ].join(";");
-        row.onmouseenter = () => row.style.background = theme.problemRowHover;
-        row.onmouseleave = () => row.style.background = "";
-
         const intensity = totalErrors(p) / maxErr;
-        row.style.borderLeft = `3px solid ${intensity > 0.66 ? "#e74c3c" : intensity > 0.33 ? "#e67e22" : "#27ae60"}`;
+        const borderClr = intensity > 0.66 ? "#e74c3c" : intensity > 0.33 ? "#e67e22" : "#27ae60";
+        row.style.cssText = ["display:flex", "align-items:center", "gap:6px", "padding:6px 12px", i > 0 ? `border-top:1px solid ${theme.borderLighter}` : "", "cursor:pointer", "min-width:0", `border-left:2px solid ${borderClr}`].join(";");
 
         const link = document.createElement("a");
         link.href = `https://codeforces.com/contest/${p.contestId}/problem/${p.index}`;
         link.target = "_blank"; link.rel = "noopener";
-        link.style.cssText = [
-          `color:${theme.problemLink}`, "text-decoration:none", "font-size:12px",
-          "font-weight:600", "flex:0 0 auto", "min-width:110px", "max-width:180px",
-          "overflow:hidden", "text-overflow:ellipsis", "white-space:nowrap"
-        ].join(";");
+        link.style.cssText = [`color:${theme.problemLink}`, "text-decoration:none", "font-size:12px", "font-weight:600", "flex:0 0 auto", "min-width:100px", "max-width:175px", "overflow:hidden", "text-overflow:ellipsis", "white-space:nowrap"].join(";");
         link.textContent = `${p.index}. ${p.name}`; link.title = p.name;
-        link.onmouseenter = () => link.style.textDecoration = "underline";
-        link.onmouseleave = () => link.style.textDecoration = "none";
         link.addEventListener("click", e => e.stopPropagation());
         row.appendChild(link);
 
@@ -1282,75 +1202,113 @@
         fill.style.cssText = "flex:1 1 0;min-width:8px;";
         row.appendChild(fill);
 
-        if (p.tags && p.tags.length) {
-          row.appendChild(buildTagChips(p.tags, isDark, theme.muted));
-        }
+        if (p.tags && p.tags.length) row.appendChild(buildTagChips(p.tags, isDark, theme.muted));
 
         if (p.rating) {
           const rb = document.createElement("span");
           rb.style.cssText = `font-size:11px;color:${theme.muted};white-space:nowrap;flex-shrink:0;`;
-          rb.textContent = "★" + p.rating; row.appendChild(rb);
+          rb.textContent = "★ " + p.rating;
+          row.appendChild(rb);
         }
 
         [
           { key:"wa",    label:"WA",  bg:theme.waBadge,  fg:theme.waBadgeText },
-          { key:"tle",   label:"TLE", bg:tleBg,           fg:tleFg },
-          { key:"rte",   label:"RTE", bg:rteBg,           fg:rteFg },
-          { key:"mle",   label:"MLE", bg:mleBg,           fg:mleFg },
-          { key:"other", label:"ERR", bg:errBg,           fg:theme.muted },
+          { key:"tle",   label:"TLE", bg:theme.tleBg,    fg:theme.tleFg       },
+          { key:"rte",   label:"RTE", bg:theme.rteBg,    fg:theme.rteFg       },
+          { key:"mle",   label:"MLE", bg:theme.mleBg,    fg:theme.mleFg       },
+          { key:"other", label:"Err", bg:theme.errBg,    fg:theme.errFg       },
         ].forEach(({ key, label, bg, fg }) => {
-          const cnt = p[key]||0; if (!cnt) return;
+          const cnt = p[key] || 0; if (!cnt) return;
           const badge = document.createElement("span");
-          badge.style.cssText = [
-            `background:${bg}`, `color:${fg}`, "font-size:11px", "font-weight:700",
-            "border-radius:4px", "padding:1px 6px", "white-space:nowrap", "flex-shrink:0"
-          ].join(";");
-          badge.textContent = `${label} ×${cnt}`; row.appendChild(badge);
+          badge.style.cssText = [`background:${bg}`, `color:${fg}`, "font-size:10px", "font-weight:700", "border-radius:3px", "padding:1px 6px", "white-space:nowrap", "flex-shrink:0"].join(";");
+          badge.textContent = `${label} ×${cnt}`;
+          row.appendChild(badge);
         });
 
         const sb = document.createElement("span");
         if (p.solved) {
-          sb.style.cssText = `background:${theme.solvedBadge};color:${theme.solvedBadgeText};font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;white-space:nowrap;flex-shrink:0;`;
-          sb.textContent = "✓ AC'd";
+          sb.style.cssText = `background:${theme.solvedBadge};color:${theme.solvedBadgeText};font-size:10px;font-weight:700;border-radius:3px;padding:1px 6px;white-space:nowrap;flex-shrink:0;`;
+          sb.textContent = "✓ AC";
         } else {
-          sb.style.cssText = `background:${theme.waBadge};color:${theme.waBadgeText};font-size:11px;border-radius:4px;padding:1px 6px;white-space:nowrap;flex-shrink:0;opacity:0.75;`;
+          sb.style.cssText = `background:${theme.waBadge};color:${theme.waBadgeText};font-size:10px;border-radius:3px;padding:1px 6px;white-space:nowrap;flex-shrink:0;opacity:0.7;`;
           sb.textContent = "Unsolved";
         }
         row.appendChild(sb);
         row.addEventListener("click", () => window.open(`https://codeforces.com/contest/${p.contestId}/problem/${p.index}`, "_blank"));
-        wrap.appendChild(row);
+        listArea.appendChild(row);
       });
-      return wrap;
     }
 
-    function renderTabContent() {
-      listArea.innerHTML = "";
-      if (activeTab === "category") {
-        practiceBtn.style.display = "none";
-        if (frictionView === "problems") {
-          listArea.appendChild(makeProblemList(modeData.categoryRawProblems?.[cat] || []));
-        } else {
-          listArea.appendChild(makeTopicList(contestList));
-        }
-      } else {
-        practiceBtn.style.display = "";
-        if (frictionView === "problems") {
-          listArea.appendChild(makeProblemList(localPracticeOnly ? (modeData.practiceRawProblems||[]) : (modeData.globalRawProblems||[])));
-        } else {
-          listArea.appendChild(makeTopicList(localPracticeOnly ? practiceList : globalList));
-        }
+    function openFilterDd() {
+      refreshAvailableTags(); filterDd.style.display = "flex"; filterOpen = true;
+      filterIconBtn.style.background = theme.btnActiveBg;
+      filterIconBtn.style.color = theme.btnActiveText;
+      filterIconBtn.style.borderColor = theme.btnActiveBorder;
+    }
+    function closeFilterDd() {
+      filterDd.style.display = "none"; filterOpen = false; updateFilterBtnStyle();
+    }
+    function openSortDd() {
+      buildSortOptions(); sortDd.style.display = "block"; sortOpen = true;
+      sortIconBtn.style.background = theme.btnActiveBg;
+      sortIconBtn.style.color = theme.btnActiveText;
+      sortIconBtn.style.borderColor = theme.btnActiveBorder;
+    }
+    function closeSortDd() {
+      sortDd.style.display = "none"; sortOpen = false; updateSortBtnStyle();
+    }
+
+    filterIconBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (filterOpen) { closeFilterDd(); } else { if (sortOpen) closeSortDd(); openFilterDd(); }
+    });
+    sortIconBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (sortOpen) { closeSortDd(); } else { if (filterOpen) closeFilterDd(); openSortDd(); }
+    });
+
+    minAttDec.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (localMinAttempts > 1) {
+        localMinAttempts--; minAttemptsGlobal = localMinAttempts;
+        minAttVal.textContent = String(localMinAttempts);
+        updateFilterBtnStyle(); updateSourceCounts(); renderList(); autoSave();
       }
-    }
-    renderTabContent();
+    });
+    minAttInc.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (localMinAttempts < 99) {
+        localMinAttempts++; minAttemptsGlobal = localMinAttempts;
+        minAttVal.textContent = String(localMinAttempts);
+        updateFilterBtnStyle(); updateSourceCounts(); renderList(); autoSave();
+      }
+    });
 
-    frictionScrollBox.style.cssText = [
-      "height:265px", "overflow:hidden", `border:1px solid ${theme.borderLight}`,
-      "border-radius:5px", "display:flex", "flex-direction:column", "padding:0"
-    ].join(";");
+    hideACBtn.addEventListener("click", () => {
+      localHideAC = !localHideAC; hideAC = localHideAC;
+      updateHideACBtn(); updateSourceCounts(); renderList(); autoSave();
+    });
+
+    // FIX #9: Remove previous click handler before adding a new one to prevent
+    // stale listeners from stacking up on every renderFrictionPanels call.
+    if (window._cfpmPanelClickHandler) {
+      document.removeEventListener("click", window._cfpmPanelClickHandler);
+    }
+    window._cfpmPanelClickHandler = (e) => {
+      if (filterOpen && !filterBtnWrap.contains(e.target)) closeFilterDd();
+      if (sortOpen   && !sortBtnWrap.contains(e.target))   closeSortDd();
+    };
+    document.addEventListener("click", window._cfpmPanelClickHandler);
+
+    frictionScrollBox.style.cssText = ["overflow:hidden", `border:1px solid ${theme.borderLight}`, "border-radius:5px", "display:flex", "flex-direction:column", "padding:0", "height:305px"].join(";");
     frictionScrollBox.appendChild(topBar);
+    frictionScrollBox.appendChild(tagPillRow);
     frictionScrollBox.appendChild(listArea);
+
+    refreshAvailableTags(); renderTagPills(); renderList();
   }
 
+  // ── TABLE RENDERER ──
   function renderTableForCategory(modeData, cat) {
     const idxTimes    = modeData.categoryIndexTimes[cat]    || {};
     const idxAttempts = modeData.categoryIndexAttempts[cat] || {};
@@ -1360,55 +1318,55 @@
     table.innerHTML = "";
     const headRow = document.createElement("tr");
     const corner = document.createElement("th");
-    corner.style.cssText = `text-align:left;padding:4px 14px;color:${theme.tableHeaderText};font-weight:600;border-bottom:2px solid ${theme.borderLight};`;
+    corner.style.cssText = `text-align:left;padding:5px 12px;color:${theme.tableHeaderText};font-weight:700;font-size:12px;border-bottom:2px solid ${theme.borderLight};`;
     corner.textContent = cat; headRow.appendChild(corner);
     allIdx.forEach(idx => {
       const th = document.createElement("th");
-      th.style.cssText = `text-align:center;padding:4px 14px;font-weight:700;color:${theme.headingText};border-bottom:2px solid ${theme.borderLight};`;
+      th.style.cssText = `text-align:center;padding:5px 14px;font-weight:700;font-size:13px;color:${theme.headingText};border-bottom:2px solid ${theme.borderLight};`;
       th.textContent = idx; headRow.appendChild(th);
     });
     table.appendChild(headRow);
 
     if (!allIdx.length) {
       const eRow = document.createElement("tr"), eTd = document.createElement("td");
-      eTd.colSpan = 2; eTd.style.cssText = `padding:12px 8px;color:${theme.emptyText};font-style:italic;`;
+      eTd.colSpan = 2; eTd.style.cssText = `padding:12px 8px;color:${theme.emptyText};font-style:italic;font-size:12px;`;
       eTd.textContent = "No contest data for " + cat + "."; eRow.appendChild(eTd); table.appendChild(eRow); return;
     }
 
     function makeRow(label, getCellContent) {
       const row = document.createElement("tr");
       const lbl = document.createElement("td");
-      lbl.style.cssText = `padding:7px 14px;color:${theme.tableHeaderText};font-size:12px;font-weight:600;`;
+      lbl.style.cssText = `padding:6px 12px;color:${theme.tableHeaderText};font-size:11px;font-weight:600;white-space:nowrap;`;
       lbl.textContent = label; row.appendChild(lbl);
       allIdx.forEach(idx => row.appendChild(getCellContent(idx)));
       return row;
     }
 
-    table.appendChild(makeRow("Avg min", idx => {
-      const arr = idxTimes[idx]||[], td = document.createElement("td");
-      td.style.cssText = "text-align:center;padding:7px 14px;font-weight:700;color:#1652d6;";
+    table.appendChild(makeRow("Avg. time (min)", idx => {
+      const arr = idxTimes[idx] || [], td = document.createElement("td");
+      td.style.cssText = "text-align:center;padding:6px 14px;font-weight:700;color:#1652d6;font-size:13px;";
       td.textContent = arr.length ? String(Math.round((arr.reduce((a,b)=>a+b,0)/arr.length)*10)/10) : "—"; return td;
     }));
-    table.appendChild(makeRow("Med min", idx => {
-      const arr = idxTimes[idx]||[], td = document.createElement("td");
-      td.style.cssText = `text-align:center;padding:7px 14px;font-weight:700;color:#6b4fa0;border-top:1px solid ${theme.borderLighter};`;
+    table.appendChild(makeRow("Median time (min)", idx => {
+      const arr = idxTimes[idx] || [], td = document.createElement("td");
+      td.style.cssText = `text-align:center;padding:6px 14px;font-weight:700;color:#6b4fa0;font-size:13px;border-top:1px solid ${theme.borderLighter};`;
       const m = median(arr); td.textContent = m !== null ? String(Math.round(m*10)/10) : "—"; return td;
     }));
     table.appendChild(makeRow("Solved", idx => {
       const td = document.createElement("td");
-      td.style.cssText = `text-align:center;padding:7px 14px;color:${theme.tableCellText};border-top:1px solid ${theme.borderLighter};`;
-      td.textContent = String(idxSolved[idx]||0); return td;
+      td.style.cssText = `text-align:center;padding:6px 14px;color:${theme.tableCellText};font-size:13px;border-top:1px solid ${theme.borderLighter};`;
+      td.textContent = String(idxSolved[idx] || 0); return td;
     }));
     table.appendChild(makeRow("Attempts", idx => {
       const td = document.createElement("td");
-      td.style.cssText = `text-align:center;padding:7px 14px;color:${theme.tableCellText};`;
-      td.textContent = String(idxAttempts[idx]||0); return td;
+      td.style.cssText = `text-align:center;padding:6px 14px;color:${theme.tableCellText};font-size:13px;`;
+      td.textContent = String(idxAttempts[idx] || 0); return td;
     }));
-    table.appendChild(makeRow("WA%", idx => {
-      const att = idxAttempts[idx]||0, sol = idxSolved[idx]||0, td = document.createElement("td");
-      td.style.cssText = `text-align:center;padding:7px 14px;font-weight:700;border-top:1px solid ${theme.borderLighter};`;
+    table.appendChild(makeRow("Failure %", idx => {
+      const att = idxAttempts[idx] || 0, sol = idxSolved[idx] || 0, td = document.createElement("td");
+      td.style.cssText = `text-align:center;padding:6px 14px;font-weight:700;font-size:13px;border-top:1px solid ${theme.borderLighter};`;
       if (att > 0) {
-        const r = Math.round(((att-sol)/att)*100);
+        const r = Math.round(((att - sol) / att) * 100);
         td.style.color = r < 40 ? "#27ae60" : r < 70 ? "#e67e22" : "#e74c3c";
         td.textContent = r + "%";
       } else { td.style.color = theme.tableCellText; td.textContent = "—"; }
@@ -1423,13 +1381,13 @@
     currentCategory = cat;
     Object.keys(categoryButtons).forEach(k => {
       const b = categoryButtons[k], active = k === cat;
-      b.style.background = active ? theme.activeButtonBg : theme.buttonBg;
-      b.style.color      = active ? theme.activeButtonText : theme.buttonText;
-      b.style.border     = active ? `1px solid ${theme.activeButtonBg}` : `1px solid ${theme.buttonBorder}`;
+      b.style.background  = active ? theme.btnActiveBg : theme.btnBg;
+      b.style.color       = active ? theme.btnActiveText : theme.btnText;
+      b.style.borderColor = active ? theme.btnActiveBorder : theme.btnBorder;
     });
 
     const mode = modeSelect.value, timeline = savedTimeline;
-    info.textContent = "Calculating stats…";
+    info.textContent = "Calculating…";
 
     const timelineValue = timeline === "custom"
       ? { type: "custom", start: startDateInput.value, end: endDateInput.value }
@@ -1440,21 +1398,24 @@
 
     let timelineLabel;
     if (timeline === "custom" && startDateInput.value && endDateInput.value) {
-      timelineLabel = `${startDateInput.value} to ${endDateInput.value}`;
+      timelineLabel = `${startDateInput.value} → ${endDateInput.value}`;
     } else {
       const opt = Array.from(timelineSelect.options).find(o => o.value === timeline);
-      timelineLabel = opt ? opt.text : "All Time";
+      timelineLabel = opt ? opt.text : "All time";
     }
 
     const categoryCount = modeData.categoryContestCount[cat] || 0;
-    info.textContent = `Participated in ${modeData.participatedCount} contests (${cat}: ${categoryCount}) · ${mode[0].toUpperCase()+mode.slice(1)} · ${timelineLabel}`;
+    info.textContent = `${modeData.participatedCount} contests total · ${cat}: ${categoryCount} · ${mode[0].toUpperCase()+mode.slice(1)} · ${timelineLabel}`;
 
     renderTableForCategory(modeData, cat);
     renderFrictionPanels(modeData, cat);
   }
 
   const handle = (window.location.pathname.split("/")[2] || "").trim();
-  if (!handle || !/^[a-zA-Z0-9_\-\.]{2,24}$/.test(handle)) { info.textContent = "Could not detect a valid Codeforces username in the page URL."; return; }
+  if (!handle || !/^[a-zA-Z0-9_\-\.]{2,24}$/.test(handle)) {
+    info.textContent = "Could not detect a valid Codeforces username in the page URL.";
+    return;
+  }
 
   await fetchContests();
   const ok = await fetchAndStore(handle);
