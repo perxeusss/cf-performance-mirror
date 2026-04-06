@@ -18,7 +18,11 @@
   let DEFAULT_TIMELINE     = _saved.timeline    || "all";
   let DEFAULT_SORT_MODE    = _saved.sortMode    || "errors";
   let DEFAULT_HIDE_AC      = _saved.hideAC      !== undefined ? _saved.hideAC      : false;
+  let DEFAULT_HIDE_TAGS    = _saved.hideTags    !== undefined ? _saved.hideTags    : false;
+  let DEFAULT_HIDE_RATINGS = _saved.hideRatings !== undefined ? _saved.hideRatings : false;
   let DEFAULT_MIN_ATTEMPTS = _saved.minAttempts !== undefined ? _saved.minAttempts : 1;
+  let DEFAULT_RATING_MIN   = _saved.ratingMin   !== undefined ? _saved.ratingMin   : "";
+  let DEFAULT_RATING_MAX   = _saved.ratingMax   !== undefined ? _saved.ratingMax   : "";
   let DEFAULT_CUSTOM_START = _saved.customStart || "";
   let DEFAULT_CUSTOM_END   = _saved.customEnd   || "";
   let DEFAULT_TAG_FILTERS  = Array.isArray(_saved.tagFilters) ? _saved.tagFilters : [];
@@ -92,7 +96,6 @@
       muted: isDark ? '#999' : '#777',
       mutedStrong: isDark ? '#bbb' : '#555',
       headingText: isDark ? '#ddd' : '#222',
-      btnH: '30px', btnRadius: '5px', btnFontSize: '12px', btnFontWeight: '600',
       btnBg: isDark ? '#2e2e2e' : '#f4f4f4',
       btnText: isDark ? '#ccc' : '#444',
       btnBorder: isDark ? '#484848' : '#d0d0d0',
@@ -123,6 +126,10 @@
   let defaultSortMode = (DEFAULT_SORT_MODE === "attempts" || DEFAULT_SORT_MODE === "wa") ? "errors" : DEFAULT_SORT_MODE;
   if (defaultSortMode !== "errors" && defaultSortMode !== "rating") defaultSortMode = "errors";
   let hideAC            = DEFAULT_HIDE_AC;
+  let hideTagsGlobal    = DEFAULT_HIDE_TAGS;
+  let hideRatingsGlobal = DEFAULT_HIDE_RATINGS;
+  let ratingMinGlobal   = DEFAULT_RATING_MIN;
+  let ratingMaxGlobal   = DEFAULT_RATING_MAX;
   let minAttemptsGlobal = DEFAULT_MIN_ATTEMPTS;
 
   let frictionActiveTab = "category";
@@ -131,6 +138,8 @@
   let lastAppliedCustomEnd   = DEFAULT_CUSTOM_END;
   let activeTagFilters = new Set(DEFAULT_TAG_FILTERS);
 
+  let lastDeltaInfo = null;
+
   function autoSave() {
     saveSettings({
       category:    currentCategory || DEFAULT_CATEGORY,
@@ -138,7 +147,11 @@
       mode:        modeSelect.value,
       sortMode:    defaultSortMode,
       hideAC:      hideAC,
+      hideTags:    hideTagsGlobal,
+      hideRatings: hideRatingsGlobal,
       minAttempts: minAttemptsGlobal,
+      ratingMin:   ratingMinGlobal,
+      ratingMax:   ratingMaxGlobal,
       customStart: startDateInput ? startDateInput.value : "",
       customEnd:   endDateInput   ? endDateInput.value   : "",
       tagFilters:  Array.from(activeTagFilters),
@@ -199,7 +212,7 @@
         white-space: nowrap; outline: none !important;
       }
       .cfpm-step-btn {
-        width: 28px; height: 28px; border-radius: 5px;
+        width: 24px; height: 24px; border-radius: 4px;
         display: flex; align-items: center; justify-content: center;
         cursor: pointer; flex-shrink: 0; outline: none !important;
         -webkit-appearance: none; appearance: none;
@@ -223,27 +236,79 @@
         display: flex; align-items: center; gap: 10px;
         padding: 9px 14px; font-size: 13px; cursor: pointer; user-select: none;
       }
-      .cfpm-src-btn {
-        display: inline-flex; align-items: center; gap: 6px;
-        height: 26px; padding: 0 11px; border-radius: 4px;
-        font-size: 11px; font-weight: 600; cursor: pointer;
-        white-space: nowrap; border: none; outline: none !important;
+      .cfpm-view-opt {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 14px; font-size: 13px; cursor: pointer; user-select: none;
       }
       #cfpm-filter-dd {
         position: absolute; top: calc(100% + 6px); right: 0; z-index: 10000;
-        border-radius: 7px; overflow: hidden; min-width: 248px; max-width: 290px;
+        border-radius: 6px; overflow: hidden; min-width: 260px; max-width: 300px;
         display: flex; flex-direction: column;
-        box-shadow: 0 6px 24px rgba(0,0,0,0.13), 0 1.5px 4px rgba(0,0,0,0.07);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08);
       }
       #cfpm-sort-dd {
         position: absolute; top: calc(100% + 6px); right: 0; z-index: 10000;
         border-radius: 7px; overflow: hidden; min-width: 190px;
         box-shadow: 0 6px 24px rgba(0,0,0,0.13), 0 1.5px 4px rgba(0,0,0,0.07);
       }
-      #cfpm-tag-list { overflow-y: auto; max-height: 180px; }
+      #cfpm-view-dd {
+        position: absolute; top: calc(100% + 6px); right: 0; z-index: 10000;
+        border-radius: 7px; overflow: hidden; min-width: 210px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.13), 0 1.5px 4px rgba(0,0,0,0.07);
+      }
+      #cfpm-tag-list { overflow-y: auto; max-height: 150px; }
       #cfpm-tag-list::-webkit-scrollbar { width: 4px; }
       #cfpm-tag-list::-webkit-scrollbar-track { background: transparent; }
       #cfpm-tag-list::-webkit-scrollbar-thumb { border-radius: 2px; background: rgba(128,128,128,0.25); }
+      .cfpm-rating-input::-webkit-outer-spin-button,
+      .cfpm-rating-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      .cfpm-rating-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+      /* Tag search input */
+      .cfpm-tag-search {
+        width: 100%; box-sizing: border-box;
+        height: 28px; padding: 0 10px 0 28px;
+        font-size: 12px; font-family: inherit;
+        outline: none; border: none; border-bottom: 1px solid transparent;
+        background: transparent;
+      }
+      .cfpm-tag-search-wrap {
+        position: relative; display: flex; align-items: center;
+      }
+      .cfpm-tag-search-wrap svg {
+        position: absolute; left: 9px; pointer-events: none; flex-shrink: 0;
+      }
+
+      /* Add topic button */
+      .cfpm-add-topic-btn {
+        display: inline-flex; align-items: center; gap: 4px;
+        height: 22px; padding: 0 8px; border-radius: 3px;
+        font-size: 11px; font-weight: 600; cursor: pointer;
+        white-space: nowrap; outline: none !important;
+        -webkit-appearance: none; appearance: none;
+        transition: none !important;
+      }
+
+      /* Topic picker panel */
+      .cfpm-topic-picker {
+        overflow: hidden;
+        transition: max-height 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.18s ease;
+        max-height: 0; opacity: 0;
+      }
+
+      /* Selected tag pills inside filter */
+      .cfpm-filter-tag-pills {
+        display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px 8px 12px;
+      }
+      .cfpm-filter-tag-pill {
+        display: inline-flex; align-items: center; gap: 3px;
+        height: 20px; padding: 0 7px; border-radius: 10px;
+        font-size: 11px; font-weight: 600; cursor: pointer;
+        user-select: none; white-space: nowrap;
+      }
+      .cfpm-filter-tag-pill-x {
+        font-size: 9px; opacity: 0.6; margin-left: 1px;
+      }
     `;
     document.head.appendChild(s);
   }
@@ -458,7 +523,7 @@
   frictionSection.style.cssText = `margin-top:10px;border-top:1px solid ${theme.borderLight};padding-top:10px;`;
   const frictionScrollBox = document.createElement("div");
   frictionScrollBox.style.cssText = [
-    "height:265px", "overflow:hidden", `border:1px solid ${theme.borderLight}`,
+    "height:305px", "overflow:hidden", `border:1px solid ${theme.borderLight}`,
     "border-radius:5px", "display:flex", "flex-direction:column", "padding:0"
   ].join(";");
   frictionSection.appendChild(frictionScrollBox);
@@ -519,7 +584,10 @@
       theme = newTheme;
       previousTheme = { isDark: newIsDark, bg: theme.bg, border: theme.border };
       applyTheme();
-      if (currentCategory && lastModeData) { renderTableForCategory(lastModeData, currentCategory); renderFrictionPanels(lastModeData, currentCategory); }
+      if (currentCategory && lastModeData) {
+        renderTableForCategory(lastModeData, currentCategory, lastDeltaInfo);
+        renderFrictionPanels(lastModeData, currentCategory);
+      }
     }
   }
 
@@ -530,11 +598,8 @@
   ['.info','.roundbox','#pageContent'].map(sel => document.querySelector(sel)).filter(Boolean)
     .forEach(el => themeObserver.observe(el, { attributes: true, attributeFilter: ['style','class'] }));
 
-  // FIX #10: Clear any existing interval before setting a new one to prevent
-  // duplicate intervals if the script ever reinjects on the same page session.
   if (window._cfpmThemeInterval) clearInterval(window._cfpmThemeInterval);
   window._cfpmThemeInterval = setInterval(updateTheme, 500);
-
   window.addEventListener('focus', updateTheme);
 
   function median(arr) {
@@ -544,6 +609,50 @@
   }
 
   function totalErrors(p) { return (p.wa||0) + (p.tle||0) + (p.rte||0) + (p.mle||0) + (p.other||0); }
+
+  function getRatingColor(r) {
+    if (!r || r < 1200) return "#808080";
+    if (r < 1400) return "#008000";
+    if (r < 1600) return "#03a89e";
+    if (r < 1900) return "#0000ff";
+    if (r < 2100) return "#aa00aa";
+    if (r < 2400) return "#ff8c00";
+    if (r < 3000) return "#ff0000";
+    return "#cc0000";
+  }
+
+  function calcDeltaRating(cat, timelineValue) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    let cutoffTime = 0, endTime = nowSec;
+
+    if (typeof timelineValue === 'object' && timelineValue.type === 'custom') {
+      if (timelineValue.start && timelineValue.end) {
+        cutoffTime = new Date(timelineValue.start).getTime() / 1000;
+        endTime    = new Date(timelineValue.end).getTime()   / 1000 + 86399;
+      }
+    } else if (timelineValue !== "all") {
+      cutoffTime = nowSec - parseInt(timelineValue) * 30 * 24 * 3600;
+    }
+
+    let delta = 0, count = 0;
+    const sorted = [...userRatingHistory].sort((a, b) => a.ratingUpdateTimeSeconds - b.ratingUpdateTimeSeconds);
+
+    sorted.forEach(rc => {
+      const t = rc.ratingUpdateTimeSeconds;
+      if (t < cutoffTime || t > endTime) return;
+      const contest = contestMap[rc.contestId];
+      if (!contest) return;
+      let contestCat = classifyContest(contest);
+      if (contestCat === "Div1+Div2") {
+        contestCat = rc.oldRating >= 1900 ? "Div1" : "Div2";
+      }
+      if (contestCat !== cat) return;
+      delta += (rc.newRating - rc.oldRating);
+      count++;
+    });
+
+    return { delta, count };
+  }
 
   function decideUserDivisionForContest(cid, contest, isUnofficial) {
     if (!contest || typeof contest.startTimeSeconds !== "number") return "Div2";
@@ -596,7 +705,7 @@
     } catch(e) { info.textContent = "Could not connect to Codeforces. Please check your connection and try again."; return false; }
   }
 
-  function recalcForMode(mode, timelineMonths, categoryFilter) {
+  function recalcForMode(mode, timelineMonths) {
     const now = Math.floor(Date.now() / 1000);
     let cutoffTime = 0, endTime = now;
 
@@ -650,7 +759,6 @@
     const everAC = new Set();
     rawSubmissions.forEach(s => { if (s.verdict === "OK" && s.problem) everAC.add(s.problem.contestId + "-" + s.problem.index); });
 
-    // Build category problem shells
     filteredSubmissions.forEach(s => {
       if (!s.problem) return;
       const cid = s.problem.contestId;
@@ -672,7 +780,6 @@
       categoryRawWAMap[cat].get(pid).solved = everAC.has(pid);
     });
 
-    // Build practice problem shells (out-of-contest, within timeline)
     filteredSubmissions.forEach(s => {
       if (!s.problem) return;
       const cid = s.problem.contestId;
@@ -693,7 +800,6 @@
       practiceRawWAMap.get(pid).solved = everAC.has(pid);
     });
 
-    // First AC tracking
     const firstACSet = new Set();
     filteredSubmissions.forEach(s => {
       if (!s.problem) return;
@@ -727,7 +833,6 @@
       if (timeMin >= 0 && timeMin <= maxAllowed) categoryIndexTimes[cat][idx].push(timeMin);
     });
 
-    // Error counting for category problems
     filteredSubmissions.forEach(s => {
       if (!s.problem || s.verdict === "OK") return;
       const cid = s.problem.contestId;
@@ -745,7 +850,6 @@
       if (categoryRawWAMap[cat].has(pid)) categoryRawWAMap[cat].get(pid)[vtype]++;
     });
 
-    // Error counting for practice problems
     filteredSubmissions.forEach(s => {
       if (!s.problem || s.verdict === "OK") return;
       const cid = s.problem.contestId;
@@ -803,11 +907,16 @@
     let activeTab        = frictionActiveTab;
     let sortMode         = defaultSortMode;
     let localHideAC      = hideAC;
+    let localHideTags    = hideTagsGlobal;
+    let localHideRatings = hideRatingsGlobal;
     let localMinAttempts = minAttemptsGlobal;
+    let localRatingMin   = ratingMinGlobal;
+    let localRatingMax   = ratingMaxGlobal;
     let localTagFilters  = new Set(activeTagFilters);
 
     let availableTags = [];
-    let filterOpen = false, sortOpen = false;
+    let filterOpen = false, sortOpen = false, viewOpen = false;
+    let topicPickerOpen = false;
 
     function getProblems() {
       return activeTab === "category"
@@ -816,10 +925,19 @@
     }
 
     function applyFilters(problems) {
+      const rMin = localRatingMin !== "" && !isNaN(parseInt(localRatingMin)) ? parseInt(localRatingMin) : null;
+      const rMax = localRatingMax !== "" && !isNaN(parseInt(localRatingMax)) ? parseInt(localRatingMax) : null;
       return problems
         .filter(p => totalErrors(p) >= localMinAttempts)
         .filter(p => !localHideAC || !p.solved)
-        .filter(p => localTagFilters.size === 0 || (p.tags || []).some(t => localTagFilters.has(t)));
+        .filter(p => localTagFilters.size === 0 || [...localTagFilters].every(t => (p.tags || []).includes(t)))
+        .filter(p => {
+          if (rMin === null && rMax === null) return true;
+          if (!p.rating) return false;
+          if (rMin !== null && p.rating < rMin) return false;
+          if (rMax !== null && p.rating > rMax) return false;
+          return true;
+        });
     }
 
     function getAllTags(problems) {
@@ -879,10 +997,8 @@
     srcContestBtn.appendChild(srcContestCount);
     srcPracticeBtn.appendChild(document.createTextNode("Practice"));
     srcPracticeBtn.appendChild(srcPracticeCount);
-
     segWrap.appendChild(srcContestBtn);
     segWrap.appendChild(srcPracticeBtn);
-
     updateSourceBtns();
     updateSourceCounts();
 
@@ -899,7 +1015,7 @@
     const rightBtns = document.createElement("div");
     rightBtns.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0;";
 
-    // Filter button + dropdown
+    // ── FILTER BUTTON + DROPDOWN ──
     const filterBtnWrap = document.createElement("div");
     filterBtnWrap.style.cssText = "position:relative;display:flex;align-items:center;";
 
@@ -913,72 +1029,243 @@
     filterDd.id = "cfpm-filter-dd";
     filterDd.style.cssText = `background:${theme.dropdownBg};border:1px solid ${theme.dropdownBorder};display:none;`;
 
-    // Min attempts section
+    // ── SECTION 1: Min. wrong attempts ──
     const minAttSection = document.createElement("div");
-    minAttSection.style.cssText = `padding:14px;border-bottom:1px solid ${theme.dropdownBorder};`;
+    minAttSection.style.cssText = `display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid ${theme.dropdownBorder};gap:10px;`;
 
-    const minAttLabel = document.createElement("div");
+    const minAttLabel = document.createElement("span");
+    minAttLabel.style.cssText = `font-size:12px;color:${theme.text};white-space:nowrap;`;
     minAttLabel.textContent = "Min. wrong attempts";
-    minAttLabel.style.cssText = `font-size:11px;font-weight:600;color:${theme.mutedStrong};margin-bottom:10px;`;
+    minAttSection.appendChild(minAttLabel);
 
-    const minAttRow = document.createElement("div");
-    minAttRow.style.cssText = "display:flex;align-items:center;gap:8px;";
+    const minAttControls = document.createElement("div");
+    minAttControls.style.cssText = "display:flex;align-items:center;gap:5px;flex-shrink:0;";
 
     const minAttDec = document.createElement("button");
     minAttDec.className = "cfpm-step-btn";
-    minAttDec.innerHTML = `<svg width="10" height="2" viewBox="0 0 10 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="0" y1="1" x2="10" y2="1"/></svg>`;
+    minAttDec.innerHTML = `<svg width="8" height="2" viewBox="0 0 8 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="0" y1="1" x2="8" y2="1"/></svg>`;
     minAttDec.style.cssText = `background:${theme.btnBg};border:1px solid ${theme.btnBorder};color:${theme.text};`;
 
     const minAttVal = document.createElement("span");
-    minAttVal.style.cssText = `display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:28px;font-size:15px;font-weight:700;color:${theme.text};border-radius:5px;background:${theme.inputBg};border:1px solid ${theme.btnBorder};`;
+    minAttVal.style.cssText = `display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;font-size:13px;font-weight:700;color:${theme.text};border-radius:4px;background:${theme.inputBg};border:1px solid ${theme.btnBorder};`;
     minAttVal.textContent = String(localMinAttempts);
 
     const minAttInc = document.createElement("button");
     minAttInc.className = "cfpm-step-btn";
-    minAttInc.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="0" x2="5" y2="10"/><line x1="0" y1="5" x2="10" y2="5"/></svg>`;
+    minAttInc.innerHTML = `<svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="0" x2="4" y2="8"/><line x1="0" y1="4" x2="8" y2="4"/></svg>`;
     minAttInc.style.cssText = `background:${theme.btnBg};border:1px solid ${theme.btnBorder};color:${theme.text};`;
 
-    const minAttNote = document.createElement("span");
-    minAttNote.style.cssText = `font-size:11px;color:${theme.muted};`;
-    minAttNote.textContent = "or more failures";
+    minAttControls.appendChild(minAttDec);
+    minAttControls.appendChild(minAttVal);
+    minAttControls.appendChild(minAttInc);
+    minAttSection.appendChild(minAttControls);
 
-    minAttRow.appendChild(minAttDec);
-    minAttRow.appendChild(minAttVal);
-    minAttRow.appendChild(minAttInc);
-    minAttRow.appendChild(minAttNote);
-    minAttSection.appendChild(minAttLabel);
-    minAttSection.appendChild(minAttRow);
+    // ── SECTION 2: Difficulty range ──
+    const ratingSection = document.createElement("div");
+    ratingSection.style.cssText = `padding:9px 12px;border-bottom:1px solid ${theme.dropdownBorder};`;
 
-    // Topic filter header
-    const topicHeader = document.createElement("div");
-    topicHeader.style.cssText = `display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px 14px;background:${theme.dropdownSection};border-bottom:1px solid ${theme.dropdownBorder};`;
+    const ratingRow = document.createElement("div");
+    ratingRow.style.cssText = "display:flex;align-items:center;gap:6px;";
 
-    const topicLabel = document.createElement("span");
-    topicLabel.textContent = "Filter by topic";
-    topicLabel.style.cssText = `font-size:11px;font-weight:600;color:${theme.mutedStrong};`;
+    const ratingLabelEl = document.createElement("span");
+    ratingLabelEl.style.cssText = `font-size:12px;color:${theme.text};white-space:nowrap;flex-shrink:0;`;
+    ratingLabelEl.textContent = "Difficulty";
 
-    const topicClearBtn = document.createElement("span");
-    topicClearBtn.textContent = "Clear all";
-    topicClearBtn.style.cssText = `font-size:11px;color:${theme.btnActiveBg};cursor:pointer;font-weight:600;display:none;`;
-    topicClearBtn.addEventListener("click", (e) => {
+    const ratingMinInput = document.createElement("input");
+    ratingMinInput.type = "number";
+    ratingMinInput.className = "cfpm-rating-input";
+    ratingMinInput.placeholder = "min";
+    ratingMinInput.min = "800"; ratingMinInput.max = "3500"; ratingMinInput.step = "100";
+    ratingMinInput.value = localRatingMin;
+    ratingMinInput.style.cssText = `width:58px;height:26px;padding:0 6px;border-radius:4px;border:1px solid ${theme.inputBorder};background:${theme.inputBg};color:${theme.inputText};font-size:12px;font-weight:600;text-align:center;font-family:Arial,sans-serif;outline:none;box-sizing:border-box;`;
+
+    const ratingDashEl = document.createElement("span");
+    ratingDashEl.textContent = "—";
+    ratingDashEl.style.cssText = `color:${theme.muted};font-size:13px;flex-shrink:0;`;
+
+    const ratingMaxInput = document.createElement("input");
+    ratingMaxInput.type = "number";
+    ratingMaxInput.className = "cfpm-rating-input";
+    ratingMaxInput.placeholder = "max";
+    ratingMaxInput.min = "800"; ratingMaxInput.max = "3500"; ratingMaxInput.step = "100";
+    ratingMaxInput.value = localRatingMax;
+    ratingMaxInput.style.cssText = `width:58px;height:26px;padding:0 6px;border-radius:4px;border:1px solid ${theme.inputBorder};background:${theme.inputBg};color:${theme.inputText};font-size:12px;font-weight:600;text-align:center;font-family:Arial,sans-serif;outline:none;box-sizing:border-box;`;
+
+    const ratingClearBtn = document.createElement("button");
+    ratingClearBtn.className = "cfpm-filter-clear-btn";
+    ratingClearBtn.textContent = "Clear";
+    ratingClearBtn.style.cssText = `font-size:11px;font-weight:600;cursor:pointer;background:none;border:none;padding:0;outline:none;color:${theme.btnActiveBg};margin-left:auto;display:${(localRatingMin !== "" || localRatingMax !== "") ? "inline" : "none"};`;
+
+    ratingRow.appendChild(ratingLabelEl);
+    ratingRow.appendChild(ratingMinInput);
+    ratingRow.appendChild(ratingDashEl);
+    ratingRow.appendChild(ratingMaxInput);
+    ratingRow.appendChild(ratingClearBtn);
+    ratingSection.appendChild(ratingRow);
+
+    function handleRatingChange() {
+      localRatingMin = ratingMinInput.value;
+      localRatingMax = ratingMaxInput.value;
+      ratingMinGlobal = localRatingMin;
+      ratingMaxGlobal = localRatingMax;
+      ratingClearBtn.style.display = (localRatingMin !== "" || localRatingMax !== "") ? "inline" : "none";
+      updateFilterBtnStyle();
+      updateSourceCounts();
+      renderList();
+      autoSave();
+    }
+
+    ratingMinInput.addEventListener("change", handleRatingChange);
+    ratingMaxInput.addEventListener("change", handleRatingChange);
+    ratingMinInput.addEventListener("keyup", handleRatingChange);
+    ratingMaxInput.addEventListener("keyup", handleRatingChange);
+    ratingMinInput.addEventListener("click", e => e.stopPropagation());
+    ratingMaxInput.addEventListener("click", e => e.stopPropagation());
+
+    ratingClearBtn.addEventListener("click", e => {
       e.stopPropagation();
-      localTagFilters.clear(); activeTagFilters.clear();
-      updateFilterBtnStyle(); renderTagPills(); renderTagListOnly(); updateSourceCounts(); renderList(); autoSave();
+      localRatingMin = ""; localRatingMax = "";
+      ratingMinGlobal = ""; ratingMaxGlobal = "";
+      ratingMinInput.value = ""; ratingMaxInput.value = "";
+      ratingClearBtn.style.display = "none";
+      updateFilterBtnStyle(); updateSourceCounts(); renderList(); autoSave();
     });
 
-    topicHeader.appendChild(topicLabel);
-    topicHeader.appendChild(topicClearBtn);
+    // ── SECTION 3: Topics ──
+    const topicsSection = document.createElement("div");
+    topicsSection.style.cssText = `padding:9px 12px 0 12px;`;
+
+    const topicsRow = document.createElement("div");
+    topicsRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:0;";
+
+    const topicsLabelEl = document.createElement("span");
+    topicsLabelEl.style.cssText = `font-size:12px;color:${theme.text};flex:1;`;
+    topicsLabelEl.textContent = "Topics";
+
+    const topicClearBtn = document.createElement("button");
+    topicClearBtn.className = "cfpm-filter-clear-btn";
+    topicClearBtn.textContent = "Clear";
+    topicClearBtn.style.cssText = `font-size:11px;font-weight:600;cursor:pointer;background:none;border:none;padding:0;outline:none;color:${theme.btnActiveBg};display:${localTagFilters.size > 0 ? "inline" : "none"};`;
+
+    const addTopicBtn = document.createElement("button");
+    addTopicBtn.className = "cfpm-add-topic-btn";
+    addTopicBtn.style.cssText = `background:${theme.btnBg};border:1px solid ${theme.btnBorder};color:${theme.btnText};cursor:pointer;`;
+
+    function updateAddTopicBtnLabel() {
+      addTopicBtn.innerHTML = topicPickerOpen
+        ? `<svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l6 6M7 1L1 7"/></svg> Close`
+        : `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4.5" y1="1" x2="4.5" y2="8"/><line x1="1" y1="4.5" x2="8" y2="4.5"/></svg> Add tag`;
+    }
+    updateAddTopicBtnLabel();
+
+    topicsRow.appendChild(topicsLabelEl);
+    topicsRow.appendChild(topicClearBtn);
+    topicsRow.appendChild(addTopicBtn);
+    topicsSection.appendChild(topicsRow);
+
+    // Selected tag pills
+    const filterTagPillsRow = document.createElement("div");
+    filterTagPillsRow.className = "cfpm-filter-tag-pills";
+    filterTagPillsRow.style.display = localTagFilters.size > 0 ? "flex" : "none";
+    filterTagPillsRow.style.marginTop = localTagFilters.size > 0 ? "7px" : "0";
+
+    function renderFilterTagPills() {
+      filterTagPillsRow.innerHTML = "";
+      const hasFilters = localTagFilters.size > 0;
+      filterTagPillsRow.style.display = hasFilters ? "flex" : "none";
+      filterTagPillsRow.style.marginTop = hasFilters ? "7px" : "0";
+      topicClearBtn.style.display = hasFilters ? "inline" : "none";
+      localTagFilters.forEach(tag => {
+        const pill = document.createElement("span");
+        pill.className = "cfpm-filter-tag-pill";
+        pill.style.cssText = `background:${detectDarkMode() ? "#16244a" : "#dbeafe"};color:${detectDarkMode() ? "#93c5fd" : "#1e40af"};border:1px solid ${detectDarkMode() ? "#2d5ba6" : "#93c5fd"};`;
+        const txt = document.createElement("span"); txt.textContent = tag;
+        const x   = document.createElement("span"); x.className = "cfpm-filter-tag-pill-x"; x.textContent = "✕";
+        pill.appendChild(txt); pill.appendChild(x);
+        pill.title = `Remove: ${tag}`;
+        pill.addEventListener("click", e => {
+          e.stopPropagation();
+          localTagFilters.delete(tag);
+          activeTagFilters = new Set(localTagFilters);
+          updateFilterBtnStyle();
+          renderFilterTagPills();
+          renderTagPills();
+          renderTagListOnly();
+          updateSourceCounts();
+          renderList();
+          autoSave();
+        });
+        filterTagPillsRow.appendChild(pill);
+      });
+    }
+    renderFilterTagPills();
+    topicsSection.appendChild(filterTagPillsRow);
+
+    // Collapsible topic picker panel
+    const topicPickerPanel = document.createElement("div");
+    topicPickerPanel.className = "cfpm-topic-picker";
+    topicPickerPanel.style.cssText = `border-top:1px solid ${theme.dropdownBorder};overflow:hidden;max-height:0;opacity:0;transition:max-height 0.22s cubic-bezier(0.4,0,0.2,1),opacity 0.18s ease;margin-top:8px;margin-left:-12px;margin-right:-12px;`;
+
+    const tagSearchWrap = document.createElement("div");
+    tagSearchWrap.className = "cfpm-tag-search-wrap";
+    tagSearchWrap.style.cssText = `position:relative;display:flex;align-items:center;border-bottom:1px solid ${theme.dropdownBorder};`;
+    tagSearchWrap.innerHTML = `<svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="${theme.muted}" stroke-width="1.6" stroke-linecap="round" style="position:absolute;left:9px;pointer-events:none;flex-shrink:0;"><circle cx="6" cy="6" r="4"/><path d="M10 10l2.5 2.5"/></svg>`;
+
+    const tagSearchInput = document.createElement("input");
+    tagSearchInput.type = "text";
+    tagSearchInput.placeholder = "Search topics…";
+    tagSearchInput.className = "cfpm-tag-search";
+    tagSearchInput.style.cssText = `width:100%;box-sizing:border-box;height:28px;padding:0 10px 0 28px;font-size:12px;font-family:Arial,sans-serif;outline:none;border:none;background:${theme.dropdownSection};color:${theme.inputText};`;
+    tagSearchWrap.appendChild(tagSearchInput);
 
     const tagListEl = document.createElement("div");
     tagListEl.id = "cfpm-tag-list";
 
+    topicPickerPanel.appendChild(tagSearchWrap);
+    topicPickerPanel.appendChild(tagListEl);
+    topicsSection.appendChild(topicPickerPanel);
+
+    addTopicBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      topicPickerOpen = !topicPickerOpen;
+      updateAddTopicBtnLabel();
+      if (topicPickerOpen) {
+        topicPickerPanel.style.maxHeight = "200px";
+        topicPickerPanel.style.opacity = "1";
+        tagSearchInput.value = "";
+        renderTagListOnly();
+        setTimeout(() => tagSearchInput.focus(), 50);
+      } else {
+        topicPickerPanel.style.maxHeight = "0";
+        topicPickerPanel.style.opacity = "0";
+      }
+    });
+
+    tagSearchInput.addEventListener("input", () => renderTagListOnly());
+    tagSearchInput.addEventListener("click", e => e.stopPropagation());
+    tagSearchInput.addEventListener("keydown", e => {
+      if (e.key === "Escape") {
+        topicPickerOpen = false; updateAddTopicBtnLabel();
+        topicPickerPanel.style.maxHeight = "0";
+        topicPickerPanel.style.opacity = "0";
+      }
+    });
+
+    topicClearBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      localTagFilters.clear(); activeTagFilters.clear();
+      updateFilterBtnStyle(); renderFilterTagPills(); renderTagPills(); renderTagListOnly(); updateSourceCounts(); renderList(); autoSave();
+    });
+
+    // Assemble filter dropdown
     filterDd.appendChild(minAttSection);
-    filterDd.appendChild(topicHeader);
-    filterDd.appendChild(tagListEl);
+    filterDd.appendChild(ratingSection);
+    filterDd.appendChild(topicsSection);
+
     filterBtnWrap.appendChild(filterIconBtn);
     filterBtnWrap.appendChild(filterDd);
 
-    // Sort button + dropdown
+    // ── SORT BUTTON + DROPDOWN ──
     const sortBtnWrap = document.createElement("div");
     sortBtnWrap.style.cssText = "position:relative;display:flex;align-items:center;";
 
@@ -1027,7 +1314,7 @@
           opt.appendChild(checkEl);
         }
 
-        opt.addEventListener("click", (e) => {
+        opt.addEventListener("click", e => {
           e.stopPropagation();
           sortMode = key; defaultSortMode = key;
           sortIconBtn.title = key === "rating" ? "Sort: by rating" : "Sort: by errors";
@@ -1040,31 +1327,120 @@
     sortBtnWrap.appendChild(sortIconBtn);
     sortBtnWrap.appendChild(sortDd);
 
-    const divider = document.createElement("span");
-    divider.style.cssText = `display:inline-block;width:1px;height:18px;background:${theme.borderLight};flex-shrink:0;`;
+    // ── VIEW OPTIONS BUTTON + DROPDOWN ──
+    const viewBtnWrap = document.createElement("div");
+    viewBtnWrap.style.cssText = "position:relative;display:flex;align-items:center;";
 
-    // Hide AC button
-    const hideACBtn = document.createElement("button");
-    hideACBtn.className = "cfpm-pill-btn";
+    const viewIconBtn = document.createElement("button");
+    viewIconBtn.className = "cfpm-icon-btn";
+    viewIconBtn.title = "View options";
+    viewIconBtn.style.cssText = `background:${theme.btnBg};border:1px solid ${theme.btnBorder};color:${theme.muted};`;
+    viewIconBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>`;
 
-    function updateHideACBtn() {
-      hideACBtn.textContent = localHideAC ? "Unsolved only" : "All problems";
-      hideACBtn.style.cssText = [
-        `background:${localHideAC ? theme.btnActiveBg : theme.btnBg}`,
-        `color:${localHideAC ? theme.btnActiveText : theme.btnText}`,
-        `border:1px solid ${localHideAC ? theme.btnActiveBorder : theme.btnBorder}`,
-      ].join(";");
+    const viewDd = document.createElement("div");
+    viewDd.id = "cfpm-view-dd";
+    viewDd.style.cssText = `background:${theme.dropdownBg};border:1px solid ${theme.dropdownBorder};display:none;`;
+
+    const viewDdLabel = document.createElement("div");
+    viewDdLabel.textContent = "View options";
+    viewDdLabel.style.cssText = `padding:10px 14px 8px 14px;font-size:11px;font-weight:600;color:${theme.mutedStrong};border-bottom:1px solid ${theme.dropdownBorder};background:${theme.dropdownSection};`;
+    viewDd.appendChild(viewDdLabel);
+
+    viewBtnWrap.appendChild(viewIconBtn);
+    viewBtnWrap.appendChild(viewDd);
+
+    function buildViewOptions() {
+      while (viewDd.children.length > 1) viewDd.removeChild(viewDd.lastChild);
+
+      const opts = [
+        {
+          label: "Unsolved only",
+          desc:  "Hide already-solved problems",
+          isActive: localHideAC,
+          toggle: () => { localHideAC = !localHideAC; hideAC = localHideAC; }
+        },
+        {
+          label: "Hide topic tags",
+          desc:  "Don't show topic tags",
+          isActive: localHideTags,
+          toggle: () => { localHideTags = !localHideTags; hideTagsGlobal = localHideTags; }
+        },
+        {
+          label: "Hide ratings",
+          desc:  "Don't show difficulty ratings",
+          isActive: localHideRatings,
+          toggle: () => { localHideRatings = !localHideRatings; hideRatingsGlobal = localHideRatings; }
+        },
+      ];
+
+      opts.forEach(({ label, desc, isActive, toggle }) => {
+        const opt = document.createElement("div");
+        opt.className = "cfpm-view-opt";
+        opt.style.cssText = [
+          `background:${isActive ? (detectDarkMode() ? "#16244a" : "#f0f5ff") : "transparent"}`,
+          `color:${theme.text}`
+        ].join(";");
+
+        const checkBox = document.createElement("span");
+        checkBox.style.cssText = [
+          "width:14px", "height:14px", "border-radius:3px", "flex-shrink:0",
+          "display:inline-flex", "align-items:center", "justify-content:center",
+          "font-size:9px", "color:#fff", "box-sizing:border-box",
+          `border:1.5px solid ${isActive ? theme.btnActiveBg : theme.btnBorder}`,
+          `background:${isActive ? theme.btnActiveBg : "transparent"}`
+        ].join(";");
+        if (isActive) checkBox.textContent = "✓";
+
+        const leftCol = document.createElement("div");
+        leftCol.style.cssText = "display:flex;flex-direction:column;gap:2px;flex:1;";
+
+        const lblEl = document.createElement("div");
+        lblEl.style.cssText = `font-size:12px;font-weight:${isActive ? "700" : "600"};color:${isActive ? theme.btnActiveBg : theme.text};`;
+        lblEl.textContent = label;
+
+        const descEl = document.createElement("div");
+        descEl.textContent = desc;
+        descEl.style.cssText = `font-size:11px;color:${theme.muted};`;
+
+        leftCol.appendChild(lblEl);
+        leftCol.appendChild(descEl);
+        opt.appendChild(checkBox);
+        opt.appendChild(leftCol);
+
+        opt.addEventListener("click", e => {
+          e.stopPropagation();
+          toggle();
+          buildViewOptions();
+          updateViewBtnStyle();
+          updateSourceCounts();
+          renderList();
+          autoSave();
+        });
+
+        viewDd.appendChild(opt);
+      });
     }
-    updateHideACBtn();
+
+    function updateViewBtnStyle() {
+      const hasActive = localHideAC || localHideTags || localHideRatings;
+      viewIconBtn.style.background  = hasActive ? theme.btnActiveBg : theme.btnBg;
+      viewIconBtn.style.color       = hasActive ? theme.btnActiveText : theme.muted;
+      viewIconBtn.style.borderColor = hasActive ? theme.btnActiveBorder : theme.btnBorder;
+      const parts = [];
+      if (localHideAC)      parts.push("Unsolved only");
+      if (localHideTags)    parts.push("Tags hidden");
+      if (localHideRatings) parts.push("Ratings hidden");
+      viewIconBtn.title = parts.length ? parts.join(" · ") : "View options";
+    }
+    updateViewBtnStyle();
 
     rightBtns.appendChild(filterBtnWrap);
     rightBtns.appendChild(sortBtnWrap);
-    rightBtns.appendChild(divider);
-    rightBtns.appendChild(hideACBtn);
+    rightBtns.appendChild(viewBtnWrap);
     topBar.appendChild(segWrap);
     topBar.appendChild(rightBtns);
 
-    // ── ACTIVE TAG PILLS ROW ──
+    // ── ACTIVE TAG PILLS ROW (below top bar, outside dropdown) ──
     const tagPillRow = document.createElement("div");
     tagPillRow.style.cssText = [
       "display:none", "align-items:center", "padding:5px 12px",
@@ -1075,7 +1451,6 @@
     function renderTagPills() {
       tagPillRow.innerHTML = "";
       tagPillRow.style.display = localTagFilters.size > 0 ? "flex" : "none";
-      topicClearBtn.style.display = localTagFilters.size > 0 ? "inline" : "none";
       if (!localTagFilters.size) return;
       localTagFilters.forEach(tag => {
         const pill = document.createElement("span");
@@ -1087,7 +1462,7 @@
         pill.title = `Remove: ${tag}`;
         pill.addEventListener("click", () => {
           localTagFilters.delete(tag); activeTagFilters = new Set(localTagFilters);
-          updateFilterBtnStyle(); renderTagPills(); renderTagListOnly(); updateSourceCounts(); renderList(); autoSave();
+          updateFilterBtnStyle(); renderTagPills(); renderFilterTagPills(); renderTagListOnly(); updateSourceCounts(); renderList(); autoSave();
         });
         tagPillRow.appendChild(pill);
       });
@@ -1099,13 +1474,18 @@
 
     function getFilterTitle() {
       const parts = [];
-      if (localMinAttempts > 1) parts.push(`Min ${localMinAttempts}`);
+      if (localMinAttempts > 1) parts.push(`Min ${localMinAttempts} errors`);
+      if (localRatingMin !== "" || localRatingMax !== "") {
+        const rlo = localRatingMin || "any";
+        const rhi = localRatingMax || "any";
+        parts.push(`Rating ${rlo}–${rhi}`);
+      }
       if (localTagFilters.size > 0) parts.push(`${localTagFilters.size} topic${localTagFilters.size > 1 ? "s" : ""}`);
-      return parts.length ? `Filters active: ${parts.join(", ")}` : "Filter";
+      return parts.length ? `Filters: ${parts.join(", ")}` : "Filter";
     }
 
     function updateFilterBtnStyle() {
-      const hasFilter = localTagFilters.size > 0 || localMinAttempts > 1;
+      const hasFilter = localTagFilters.size > 0 || localMinAttempts > 1 || localRatingMin !== "" || localRatingMax !== "";
       filterIconBtn.style.background  = hasFilter ? theme.btnActiveBg : theme.btnBg;
       filterIconBtn.style.color       = hasFilter ? theme.btnActiveText : theme.muted;
       filterIconBtn.style.borderColor = hasFilter ? theme.btnActiveBorder : theme.btnBorder;
@@ -1125,17 +1505,27 @@
 
     function renderTagListOnly() {
       tagListEl.innerHTML = "";
-      if (!availableTags.length) {
+      const searchVal = tagSearchInput.value.toLowerCase().trim();
+      const combinedTags = new Set([...availableTags, ...localTagFilters]);
+      const allTagsSorted = Array.from(combinedTags).sort()
+        .filter(tag => !searchVal || tag.toLowerCase().includes(searchVal));
+
+      if (!allTagsSorted.length) {
         const empty = document.createElement("div");
-        empty.style.cssText = `padding:14px;color:${theme.emptyText};font-size:12px;font-style:italic;text-align:center;`;
-        empty.textContent = "No topics available.";
+        empty.style.cssText = `padding:12px;color:${theme.emptyText};font-size:12px;font-style:italic;text-align:center;`;
+        empty.textContent = searchVal ? "No matching topics." : "No topics available.";
         tagListEl.appendChild(empty); return;
       }
-      availableTags.forEach(tag => {
+      allTagsSorted.forEach(tag => {
         const isActive = localTagFilters.has(tag);
+        const isAvailable = availableTags.includes(tag);
         const row = document.createElement("div");
         row.className = "cfpm-tag-opt";
-        row.style.cssText = [`background:${isActive ? (detectDarkMode() ? "#16244a" : "#eff6ff") : "transparent"}`, `color:${theme.text}`].join(";");
+        row.style.cssText = [
+          `background:${isActive ? (detectDarkMode() ? "#16244a" : "#eff6ff") : "transparent"}`,
+          `color:${isAvailable ? theme.text : theme.muted}`,
+          isAvailable ? "" : "opacity:0.55;"
+        ].join(";");
 
         const check = document.createElement("span");
         check.className = "cfpm-tag-check";
@@ -1143,15 +1533,15 @@
         if (isActive) check.textContent = "✓";
 
         const lbl = document.createElement("span");
-        lbl.textContent = tag;
+        lbl.textContent = tag + (!isAvailable ? " (none here)" : "");
         lbl.style.cssText = `flex:1;word-break:break-word;line-height:1.4;font-weight:${isActive ? "600" : "400"};`;
         row.appendChild(check); row.appendChild(lbl);
 
-        row.addEventListener("click", (e) => {
+        row.addEventListener("click", e => {
           e.stopPropagation();
           if (localTagFilters.has(tag)) localTagFilters.delete(tag); else localTagFilters.add(tag);
           activeTagFilters = new Set(localTagFilters);
-          updateFilterBtnStyle(); renderTagListOnly(); renderTagPills(); updateSourceCounts(); renderList(); autoSave();
+          updateFilterBtnStyle(); renderTagListOnly(); renderTagPills(); renderFilterTagPills(); updateSourceCounts(); renderList(); autoSave();
         });
         tagListEl.appendChild(row);
       });
@@ -1160,9 +1550,9 @@
     function refreshAvailableTags() {
       const allProblems = getProblems();
       availableTags = getAllTags(allProblems);
-      localTagFilters.forEach(t => { if (!availableTags.includes(t)) localTagFilters.delete(t); });
-      activeTagFilters = new Set(localTagFilters);
-      renderTagListOnly(); renderTagPills();
+      renderTagListOnly();
+      renderTagPills();
+      renderFilterTagPills();
     }
 
     function renderList() {
@@ -1173,7 +1563,8 @@
       if (!problems.length) {
         const empty = document.createElement("div");
         empty.style.cssText = `padding:24px 14px;color:${theme.emptyText};font-style:italic;font-size:13px;text-align:center;`;
-        empty.textContent = localTagFilters.size > 0 ? "No problems match the selected topics." : "No problems with errors found.";
+        const hasActiveFilters = localTagFilters.size > 0 || localRatingMin !== "" || localRatingMax !== "";
+        empty.textContent = hasActiveFilters ? "No problems match the selected filters." : "No problems with errors found.";
         listArea.appendChild(empty); return;
       }
 
@@ -1188,12 +1579,20 @@
         const row = document.createElement("div");
         const intensity = totalErrors(p) / maxErr;
         const borderClr = intensity > 0.66 ? "#e74c3c" : intensity > 0.33 ? "#e67e22" : "#27ae60";
-        row.style.cssText = ["display:flex", "align-items:center", "gap:6px", "padding:6px 12px", i > 0 ? `border-top:1px solid ${theme.borderLighter}` : "", "cursor:pointer", "min-width:0", `border-left:2px solid ${borderClr}`].join(";");
+        row.style.cssText = [
+          "display:flex", "align-items:center", "gap:6px", "padding:6px 12px",
+          i > 0 ? `border-top:1px solid ${theme.borderLighter}` : "",
+          "cursor:pointer", "min-width:0", `border-left:2px solid ${borderClr}`
+        ].join(";");
 
         const link = document.createElement("a");
         link.href = `https://codeforces.com/contest/${p.contestId}/problem/${p.index}`;
         link.target = "_blank"; link.rel = "noopener";
-        link.style.cssText = [`color:${theme.problemLink}`, "text-decoration:none", "font-size:12px", "font-weight:600", "flex:0 0 auto", "min-width:100px", "max-width:175px", "overflow:hidden", "text-overflow:ellipsis", "white-space:nowrap"].join(";");
+        link.style.cssText = [
+          `color:${theme.problemLink}`, "text-decoration:none", "font-size:12px", "font-weight:600",
+          "flex:0 0 auto", "min-width:100px", "max-width:175px",
+          "overflow:hidden", "text-overflow:ellipsis", "white-space:nowrap"
+        ].join(";");
         link.textContent = `${p.index}. ${p.name}`; link.title = p.name;
         link.addEventListener("click", e => e.stopPropagation());
         row.appendChild(link);
@@ -1202,11 +1601,13 @@
         fill.style.cssText = "flex:1 1 0;min-width:8px;";
         row.appendChild(fill);
 
-        if (p.tags && p.tags.length) row.appendChild(buildTagChips(p.tags, isDark, theme.muted));
+        if (p.tags && p.tags.length && !localHideTags) {
+          row.appendChild(buildTagChips(p.tags, isDark, theme.muted));
+        }
 
-        if (p.rating) {
+        if (p.rating && !localHideRatings) {
           const rb = document.createElement("span");
-          rb.style.cssText = `font-size:11px;color:${theme.muted};white-space:nowrap;flex-shrink:0;`;
+          rb.style.cssText = `font-size:11px;color:${getRatingColor(p.rating)};white-space:nowrap;flex-shrink:0;font-weight:700;`;
           rb.textContent = "★ " + p.rating;
           row.appendChild(rb);
         }
@@ -1247,6 +1648,12 @@
     }
     function closeFilterDd() {
       filterDd.style.display = "none"; filterOpen = false; updateFilterBtnStyle();
+      if (topicPickerOpen) {
+        topicPickerOpen = false;
+        updateAddTopicBtnLabel();
+        topicPickerPanel.style.maxHeight = "0";
+        topicPickerPanel.style.opacity = "0";
+      }
     }
     function openSortDd() {
       buildSortOptions(); sortDd.style.display = "block"; sortOpen = true;
@@ -1257,17 +1664,30 @@
     function closeSortDd() {
       sortDd.style.display = "none"; sortOpen = false; updateSortBtnStyle();
     }
+    function openViewDd() {
+      buildViewOptions(); viewDd.style.display = "block"; viewOpen = true;
+      viewIconBtn.style.background = theme.btnActiveBg;
+      viewIconBtn.style.color = theme.btnActiveText;
+      viewIconBtn.style.borderColor = theme.btnActiveBorder;
+    }
+    function closeViewDd() {
+      viewDd.style.display = "none"; viewOpen = false; updateViewBtnStyle();
+    }
 
-    filterIconBtn.addEventListener("click", (e) => {
+    filterIconBtn.addEventListener("click", e => {
       e.stopPropagation();
-      if (filterOpen) { closeFilterDd(); } else { if (sortOpen) closeSortDd(); openFilterDd(); }
+      if (filterOpen) { closeFilterDd(); } else { if (sortOpen) closeSortDd(); if (viewOpen) closeViewDd(); openFilterDd(); }
     });
-    sortIconBtn.addEventListener("click", (e) => {
+    sortIconBtn.addEventListener("click", e => {
       e.stopPropagation();
-      if (sortOpen) { closeSortDd(); } else { if (filterOpen) closeFilterDd(); openSortDd(); }
+      if (sortOpen) { closeSortDd(); } else { if (filterOpen) closeFilterDd(); if (viewOpen) closeViewDd(); openSortDd(); }
+    });
+    viewIconBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      if (viewOpen) { closeViewDd(); } else { if (filterOpen) closeFilterDd(); if (sortOpen) closeSortDd(); openViewDd(); }
     });
 
-    minAttDec.addEventListener("click", (e) => {
+    minAttDec.addEventListener("click", e => {
       e.stopPropagation();
       if (localMinAttempts > 1) {
         localMinAttempts--; minAttemptsGlobal = localMinAttempts;
@@ -1275,7 +1695,7 @@
         updateFilterBtnStyle(); updateSourceCounts(); renderList(); autoSave();
       }
     });
-    minAttInc.addEventListener("click", (e) => {
+    minAttInc.addEventListener("click", e => {
       e.stopPropagation();
       if (localMinAttempts < 99) {
         localMinAttempts++; minAttemptsGlobal = localMinAttempts;
@@ -1284,23 +1704,20 @@
       }
     });
 
-    hideACBtn.addEventListener("click", () => {
-      localHideAC = !localHideAC; hideAC = localHideAC;
-      updateHideACBtn(); updateSourceCounts(); renderList(); autoSave();
-    });
-
-    // FIX #9: Remove previous click handler before adding a new one to prevent
-    // stale listeners from stacking up on every renderFrictionPanels call.
     if (window._cfpmPanelClickHandler) {
       document.removeEventListener("click", window._cfpmPanelClickHandler);
     }
-    window._cfpmPanelClickHandler = (e) => {
+    window._cfpmPanelClickHandler = e => {
       if (filterOpen && !filterBtnWrap.contains(e.target)) closeFilterDd();
       if (sortOpen   && !sortBtnWrap.contains(e.target))   closeSortDd();
+      if (viewOpen   && !viewBtnWrap.contains(e.target))   closeViewDd();
     };
     document.addEventListener("click", window._cfpmPanelClickHandler);
 
-    frictionScrollBox.style.cssText = ["overflow:hidden", `border:1px solid ${theme.borderLight}`, "border-radius:5px", "display:flex", "flex-direction:column", "padding:0", "height:305px"].join(";");
+    frictionScrollBox.style.cssText = [
+      "overflow:hidden", `border:1px solid ${theme.borderLight}`,
+      "border-radius:5px", "display:flex", "flex-direction:column", "padding:0", "height:305px"
+    ].join(";");
     frictionScrollBox.appendChild(topBar);
     frictionScrollBox.appendChild(tagPillRow);
     frictionScrollBox.appendChild(listArea);
@@ -1309,7 +1726,7 @@
   }
 
   // ── TABLE RENDERER ──
-  function renderTableForCategory(modeData, cat) {
+  function renderTableForCategory(modeData, cat, deltaInfo) {
     const idxTimes    = modeData.categoryIndexTimes[cat]    || {};
     const idxAttempts = modeData.categoryIndexAttempts[cat] || {};
     const idxSolved   = modeData.categoryIndexSolved[cat]   || {};
@@ -1317,9 +1734,55 @@
 
     table.innerHTML = "";
     const headRow = document.createElement("tr");
+
     const corner = document.createElement("th");
-    corner.style.cssText = `text-align:left;padding:5px 12px;color:${theme.tableHeaderText};font-weight:700;font-size:12px;border-bottom:2px solid ${theme.borderLight};`;
-    corner.textContent = cat; headRow.appendChild(corner);
+    corner.style.cssText = `text-align:left;padding:5px 12px;border-bottom:2px solid ${theme.borderLight};vertical-align:middle;`;
+
+    const cornerRow = document.createElement("div");
+    cornerRow.style.cssText = "display:flex;align-items:center;gap:7px;flex-wrap:wrap;";
+
+    const cornerCatName = document.createElement("span");
+    cornerCatName.style.cssText = `color:${theme.tableHeaderText};font-weight:700;font-size:12px;`;
+    cornerCatName.textContent = cat;
+    cornerRow.appendChild(cornerCatName);
+
+    // ── DELTA BADGE: always shown (Δ 0 when no rated contests in period) ──
+    if (deltaInfo) {
+      const isDark = detectDarkMode();
+      const deltaEl = document.createElement("span");
+      const sign = deltaInfo.delta > 0 ? "+" : "";
+      const deltaColor = deltaInfo.delta > 0 ? "#27ae60" : deltaInfo.delta < 0 ? "#e74c3c" : theme.muted;
+      const deltaBg = deltaInfo.delta > 0
+        ? (isDark ? "#0d2318" : "#e6f4ea")
+        : deltaInfo.delta < 0
+          ? (isDark ? "#2a1212" : "#fdecea")
+          : (isDark ? "#222" : "#f5f5f5");
+
+      deltaEl.style.cssText = `display:inline-flex;align-items:center;gap:3px;padding:1px 7px 1px 5px;border-radius:10px;background:${deltaBg};`;
+
+      const deltaIcon = document.createElement("span");
+      deltaIcon.textContent = "Δ";
+      deltaIcon.style.cssText = `font-size:11px;font-weight:900;color:${deltaColor};font-family:serif;line-height:1;`;
+
+      const deltaVal = document.createElement("span");
+      deltaVal.style.cssText = `font-size:11px;font-weight:700;color:${deltaColor};font-family:monospace;line-height:1;`;
+      deltaVal.textContent = `${sign}${deltaInfo.delta}`;
+
+      deltaEl.appendChild(deltaIcon);
+      deltaEl.appendChild(deltaVal);
+      cornerRow.appendChild(deltaEl);
+
+      // Tooltip: contextual based on count
+      if (deltaInfo.count > 0) {
+        corner.title = `Rating change in ${deltaInfo.count} rated ${cat} contest${deltaInfo.count !== 1 ? "s" : ""} (selected period)`;
+      } else {
+        corner.title = `No rated ${cat} contests in the selected period`;
+      }
+    }
+
+    corner.appendChild(cornerRow);
+    headRow.appendChild(corner);
+
     allIdx.forEach(idx => {
       const th = document.createElement("th");
       th.style.cssText = `text-align:center;padding:5px 14px;font-weight:700;font-size:13px;color:${theme.headingText};border-bottom:2px solid ${theme.borderLight};`;
@@ -1393,8 +1856,11 @@
       ? { type: "custom", start: startDateInput.value, end: endDateInput.value }
       : timeline;
 
-    const modeData = recalcForMode(mode, timelineValue, cat);
+    const modeData = recalcForMode(mode, timelineValue);
     lastModeData = modeData;
+
+    const deltaInfo = calcDeltaRating(cat, timelineValue);
+    lastDeltaInfo = deltaInfo;
 
     let timelineLabel;
     if (timeline === "custom" && startDateInput.value && endDateInput.value) {
@@ -1405,9 +1871,16 @@
     }
 
     const categoryCount = modeData.categoryContestCount[cat] || 0;
-    info.textContent = `${modeData.participatedCount} contests total · ${cat}: ${categoryCount} · ${mode[0].toUpperCase()+mode.slice(1)} · ${timelineLabel}`;
 
-    renderTableForCategory(modeData, cat);
+    let infoText = `${modeData.participatedCount} contests total · ${cat}: ${categoryCount}`;
+    if (deltaInfo.count > 0) {
+      const sign = deltaInfo.delta >= 0 ? "+" : "";
+      infoText += ` · Δ ${sign}${deltaInfo.delta} (${deltaInfo.count} rated)`;
+    }
+    infoText += ` · ${mode[0].toUpperCase()+mode.slice(1)} · ${timelineLabel}`;
+    info.textContent = infoText;
+
+    renderTableForCategory(modeData, cat, deltaInfo);
     renderFrictionPanels(modeData, cat);
   }
 
