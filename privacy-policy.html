@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Privacy Policy – CF Performance Mirror</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f9f9fb;
+      color: #1a1a2e;
+      line-height: 1.7;
+    }
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 40px 24px;
+      text-align: center;
+    }
+    header h1 { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.3px; }
+    header p  { margin-top: 8px; color: #a0aec0; font-size: 0.95rem; }
+    main {
+      max-width: 760px;
+      margin: 48px auto;
+      padding: 0 24px 80px;
+    }
+    section { margin-bottom: 40px; }
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      border-left: 4px solid #4f46e5;
+      padding-left: 12px;
+      margin-bottom: 14px;
+    }
+    p  { font-size: 0.97rem; color: #374151; margin-bottom: 10px; }
+    ul { padding-left: 20px; margin-bottom: 10px; }
+    li { font-size: 0.97rem; color: #374151; margin-bottom: 6px; }
+    a  { color: #4f46e5; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .highlight {
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 14px;
+    }
+    .highlight p { margin: 0; font-weight: 500; color: #3730a3; }
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 0.85rem;
+      color: #9ca3af;
+      border-top: 1px solid #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>CF Performance Mirror</h1>
+  <p>Privacy Policy &nbsp;·&nbsp; Chrome Extension</p>
+</header>
+
+<main>
+
+  <div class="highlight">
+    <p>&#x2714;&nbsp; This extension does not collect, store, or transmit any personal data to any server. All processing happens locally in your browser.</p>
+  </div>
+
+  <section>
+    <h2>1. Overview</h2>
+    <p>CF Performance Mirror ("the Extension") is a Chrome browser extension that displays enhanced performance statistics on Codeforces profile pages. This Privacy Policy explains what data the Extension accesses, how it is used, and your rights as a user.</p>
+    <p>This policy applies to all users of the Extension and was last updated on <strong>April 13, 2026</strong>.</p>
+  </section>
+
+  <section>
+    <h2>2. Data the Extension Accesses</h2>
+    <p>When you visit a Codeforces profile page (e.g. <code>https://codeforces.com/profile/&lt;username&gt;</code>), the Extension reads the following:</p>
+    <ul>
+      <li><strong>Codeforces username</strong> — extracted directly from the page URL you are already visiting.</li>
+      <li><strong>Submission history</strong> — fetched from the public Codeforces API (<code>codeforces.com/api/user.status</code>) using that username.</li>
+      <li><strong>Contest and rating data</strong> — fetched from the public Codeforces API (<code>codeforces.com/api/contest.list</code> and <code>codeforces.com/api/user.rating</code>).</li>
+    </ul>
+    <p>All of this data is publicly available on Codeforces and is only retrieved for the purpose of rendering statistics within your browser.</p>
+  </section>
+
+  <section>
+    <h2>3. How Data Is Used</h2>
+    <p>Data fetched from the Codeforces API is used exclusively to:</p>
+    <ul>
+      <li>Calculate and display performance statistics (solve times, failure rates, rating changes) on the profile page you are viewing.</li>
+      <li>Remember your filter and display preferences locally using <code>localStorage</code> in your browser.</li>
+    </ul>
+    <p>The Extension does not use this data for advertising, analytics, profiling, or any purpose other than rendering the on-page display.</p>
+  </section>
+
+  <section>
+    <h2>4. Data Storage</h2>
+    <p>The Extension stores your UI preferences (selected division, time range, display options) using the browser's <code>localStorage</code> API. This data:</p>
+    <ul>
+      <li>Never leaves your device.</li>
+      <li>Is not accessible to any third party.</li>
+      <li>Can be cleared at any time by clearing your browser's site data for <code>codeforces.com</code>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>5. Data Sharing and Third Parties</h2>
+    <p>We do not share any data with third parties. The only external communication made by the Extension is outbound API requests to <code>codeforces.com</code> — the site you are already browsing. No data is sent to the developer or any analytics service.</p>
+  </section>
+
+  <section>
+    <h2>6. Permissions</h2>
+    <p>The Extension requests the following permissions:</p>
+    <ul>
+      <li><strong>Host access to <code>codeforces.com</code></strong> — required to inject the statistics panel into Codeforces profile pages and to make API requests to the Codeforces public API.</li>
+    </ul>
+    <p>No other permissions are requested or used.</p>
+  </section>
+
+  <section>
+    <h2>7. Children's Privacy</h2>
+    <p>The Extension is not directed at children under the age of 13. We do not knowingly collect any personal information from children. The Extension only accesses publicly available data on Codeforces.</p>
+  </section>
+
+  <section>
+    <h2>8. Changes to This Policy</h2>
+    <p>If this Privacy Policy is updated, the new version will be published at this URL. Continued use of the Extension after any changes constitutes acceptance of the updated policy.</p>
+  </section>
+
+  <section>
+    <h2>9. Contact</h2>
+    <p>If you have any questions about this Privacy Policy, please open an issue on the project's GitHub repository or contact the developer through the Chrome Web Store listing.</p>
+  </section>
+
+</main>
+
+<footer>
+  &copy; 2026 CF Performance Mirror &nbsp;·&nbsp; All rights reserved
+</footer>
+
+</body>
+</html>

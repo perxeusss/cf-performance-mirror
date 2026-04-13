@@ -20,12 +20,14 @@
   let DEFAULT_HIDE_AC      = _saved.hideAC      !== undefined ? _saved.hideAC      : false;
   let DEFAULT_HIDE_TAGS    = _saved.hideTags    !== undefined ? _saved.hideTags    : false;
   let DEFAULT_HIDE_RATINGS = _saved.hideRatings !== undefined ? _saved.hideRatings : false;
-  let DEFAULT_MIN_ATTEMPTS = _saved.minAttempts !== undefined ? _saved.minAttempts : 1;
+  let DEFAULT_SOLVED_ONLY  = _saved.solvedOnly  !== undefined ? _saved.solvedOnly  : false;
+  let DEFAULT_MIN_ATTEMPTS = _saved.minAttempts !== undefined ? Math.max(1, _saved.minAttempts) : 1;
   let DEFAULT_RATING_MIN   = _saved.ratingMin   !== undefined ? _saved.ratingMin   : "";
   let DEFAULT_RATING_MAX   = _saved.ratingMax   !== undefined ? _saved.ratingMax   : "";
   let DEFAULT_CUSTOM_START = _saved.customStart || "";
   let DEFAULT_CUSTOM_END   = _saved.customEnd   || "";
   let DEFAULT_TAG_FILTERS  = Array.isArray(_saved.tagFilters) ? _saved.tagFilters : [];
+  let DEFAULT_TABLE_VISIBLE = _saved.tableVisible !== undefined ? _saved.tableVisible : true;
 
   const TOGGLE_KEY = "cfpm_enabled";
   function loadToggle() {
@@ -42,16 +44,53 @@
   let userRatingHistory = [];
   const DEFAULT_INDICES = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
+  // ── ALL CODEFORCES TAGS (shown always, independent of current timeline/div) ──
+  const ALL_CF_TAGS = [
+    "*special", "2-sat", "binary search", "bitmasks", "brute force",
+    "chinese remainder theorem", "combinatorics", "constructive algorithms",
+    "data structures", "dfs and similar", "divide and conquer", "dp", "dsu",
+    "expression parsing", "fft", "flows", "games", "geometry",
+    "graph matchings", "graphs", "greedy", "hashing", "implementation",
+    "interactive", "math", "matrices", "meet-in-the-middle", "number theory",
+    "probabilities", "schedules", "shortest paths", "sortings", "special",
+    "string suffix structures", "strings", "ternary search", "trees",
+    "two pointers"
+  ];
+
+  let defaultSortMode = DEFAULT_SORT_MODE;
+  if (defaultSortMode !== "errors" && defaultSortMode !== "rating") defaultSortMode = "errors";
+
+  let hideAC            = DEFAULT_HIDE_AC;
+  let hideTagsGlobal    = DEFAULT_HIDE_TAGS;
+  let hideRatingsGlobal = DEFAULT_HIDE_RATINGS;
+  let solvedOnlyGlobal  = DEFAULT_SOLVED_ONLY;
+  let ratingMinGlobal   = DEFAULT_RATING_MIN;
+  let ratingMaxGlobal   = DEFAULT_RATING_MAX;
+  let minAttemptsGlobal = DEFAULT_MIN_ATTEMPTS;
+  let tableVisible      = DEFAULT_TABLE_VISIBLE;
+
+  let frictionActiveTab = "category";
+  let savedTimeline = DEFAULT_TIMELINE;
+  let lastAppliedCustomStart = DEFAULT_CUSTOM_START;
+  let lastAppliedCustomEnd   = DEFAULT_CUSTOM_END;
+  let activeTagFilters = new Set(DEFAULT_TAG_FILTERS);
+
+  let lastDeltaInfo = null;
+
   function detectDarkMode() {
-    const hasDarkClass = document.documentElement.classList.contains('dark') ||
+    const hasDarkClass =
+      document.documentElement.classList.contains('dark') ||
       document.documentElement.classList.contains('dark-mode') ||
       document.body.classList.contains('dark') ||
       document.body.classList.contains('dark-mode');
     if (hasDarkClass) return true;
     const containers = [
-      document.querySelector('.info'), document.querySelector('.datatable'),
-      document.querySelector('.roundbox'), document.querySelector('#pageContent'),
-      document.querySelector('.second-level-menu-list'), document.body
+      document.querySelector('.info'),
+      document.querySelector('.datatable'),
+      document.querySelector('.roundbox'),
+      document.querySelector('#pageContent'),
+      document.querySelector('.second-level-menu-list'),
+      document.body
     ];
     for (const container of containers) {
       if (container) {
@@ -71,7 +110,10 @@
   function getBoxBackground() {
     for (const sel of ['.info', '.roundbox', '#pageContent']) {
       const el = document.querySelector(sel);
-      if (el) { const bg = window.getComputedStyle(el).backgroundColor; if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg; }
+      if (el) {
+        const bg = window.getComputedStyle(el).backgroundColor;
+        if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg;
+      }
     }
     const bodyBg = window.getComputedStyle(document.body).backgroundColor;
     if (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') return bodyBg;
@@ -81,7 +123,10 @@
   function getBoxBorderColor() {
     for (const sel of ['.roundbox', '.info', '.datatable']) {
       const el = document.querySelector(sel);
-      if (el) { const bc = window.getComputedStyle(el).borderColor; if (bc && bc !== 'rgba(0, 0, 0, 0)' && bc !== 'transparent') return bc; }
+      if (el) {
+        const bc = window.getComputedStyle(el).borderColor;
+        if (bc && bc !== 'rgba(0, 0, 0, 0)' && bc !== 'transparent') return bc;
+      }
     }
     return detectDarkMode() ? '#444' : '#d4d4d4';
   }
@@ -89,7 +134,8 @@
   function createTheme() {
     const isDark = detectDarkMode();
     return {
-      bg: getBoxBackground(), text: isDark ? '#e8e8e8' : '#0b1220',
+      bg: getBoxBackground(),
+      text: isDark ? '#e8e8e8' : '#0b1220',
       border: getBoxBorderColor(),
       borderLight: isDark ? '#3a3a3a' : '#e8e8e8',
       borderLighter: isDark ? '#2e2e2e' : '#f2f2f2',
@@ -99,7 +145,9 @@
       btnBg: isDark ? '#2e2e2e' : '#f4f4f4',
       btnText: isDark ? '#ccc' : '#444',
       btnBorder: isDark ? '#484848' : '#d0d0d0',
-      btnActiveBg: '#1652d6', btnActiveText: '#ffffff', btnActiveBorder: '#1652d6',
+      btnActiveBg: '#1652d6',
+      btnActiveText: '#ffffff',
+      btnActiveBorder: '#1652d6',
       tableHeaderText: isDark ? '#bbb' : '#666',
       tableCellText: isDark ? '#ccc' : '#555',
       emptyText: isDark ? '#666' : '#aaa',
@@ -113,50 +161,22 @@
       dropdownBorder: isDark ? '#383838' : '#e0e0e0',
       dropdownSection: isDark ? '#1a1a1a' : '#f9f9f9',
       problemLink: isDark ? '#7aabff' : '#1652d6',
-      solvedBadge: isDark ? '#1a3320' : '#e6f4ea', solvedBadgeText: isDark ? '#4caf50' : '#276221',
-      waBadge: isDark ? '#331a1a' : '#fdecea', waBadgeText: isDark ? '#f48080' : '#b71c1c',
-      tleBg: isDark ? '#2a2000' : '#fff8e1', tleFg: isDark ? '#ffd54f' : '#b45309',
-      rteBg: isDark ? '#1a1a2e' : '#ede7f6', rteFg: isDark ? '#9fa8da' : '#4527a0',
-      mleBg: isDark ? '#002828' : '#e0f2f1', mleFg: isDark ? '#4db6ac' : '#00695c',
-      errBg: isDark ? '#2a2a2a' : '#f0f0f0', errFg: isDark ? '#999' : '#555',
+      solvedBadge: isDark ? '#1a3320' : '#e6f4ea',
+      solvedBadgeText: isDark ? '#4caf50' : '#276221',
+      waBadge: isDark ? '#331a1a' : '#fdecea',
+      waBadgeText: isDark ? '#f48080' : '#b71c1c',
+      tleBg: isDark ? '#2a2000' : '#fff8e1',
+      tleFg: isDark ? '#ffd54f' : '#b45309',
+      rteBg: isDark ? '#1a1a2e' : '#ede7f6',
+      rteFg: isDark ? '#9fa8da' : '#4527a0',
+      mleBg: isDark ? '#002828' : '#e0f2f1',
+      mleFg: isDark ? '#4db6ac' : '#00695c',
+      errBg: isDark ? '#2a2a2a' : '#f0f0f0',
+      errFg: isDark ? '#999' : '#555',
     };
   }
 
   let theme = createTheme();
-  let defaultSortMode = (DEFAULT_SORT_MODE === "attempts" || DEFAULT_SORT_MODE === "wa") ? "errors" : DEFAULT_SORT_MODE;
-  if (defaultSortMode !== "errors" && defaultSortMode !== "rating") defaultSortMode = "errors";
-  let hideAC            = DEFAULT_HIDE_AC;
-  let hideTagsGlobal    = DEFAULT_HIDE_TAGS;
-  let hideRatingsGlobal = DEFAULT_HIDE_RATINGS;
-  let ratingMinGlobal   = DEFAULT_RATING_MIN;
-  let ratingMaxGlobal   = DEFAULT_RATING_MAX;
-  let minAttemptsGlobal = DEFAULT_MIN_ATTEMPTS;
-
-  let frictionActiveTab = "category";
-  let savedTimeline = DEFAULT_TIMELINE;
-  let lastAppliedCustomStart = DEFAULT_CUSTOM_START;
-  let lastAppliedCustomEnd   = DEFAULT_CUSTOM_END;
-  let activeTagFilters = new Set(DEFAULT_TAG_FILTERS);
-
-  let lastDeltaInfo = null;
-
-  function autoSave() {
-    saveSettings({
-      category:    currentCategory || DEFAULT_CATEGORY,
-      timeline:    savedTimeline,
-      mode:        modeSelect.value,
-      sortMode:    defaultSortMode,
-      hideAC:      hideAC,
-      hideTags:    hideTagsGlobal,
-      hideRatings: hideRatingsGlobal,
-      minAttempts: minAttemptsGlobal,
-      ratingMin:   ratingMinGlobal,
-      ratingMax:   ratingMaxGlobal,
-      customStart: startDateInput ? startDateInput.value : "",
-      customEnd:   endDateInput   ? endDateInput.value   : "",
-      tagFilters:  Array.from(activeTagFilters),
-    });
-  }
 
   // ── GLOBAL STYLES ──
   if (!document.getElementById("cfpm-toggle-style")) {
@@ -227,6 +247,7 @@
         padding: 6px 12px; font-size: 12px; cursor: pointer; user-select: none;
         word-break: break-word;
       }
+      .cfpm-tag-opt:hover { filter: brightness(0.95); }
       .cfpm-tag-check {
         width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
         display: flex; align-items: center; justify-content: center;
@@ -240,10 +261,11 @@
         display: flex; align-items: center; gap: 10px;
         padding: 9px 14px; font-size: 13px; cursor: pointer; user-select: none;
       }
+
       #cfpm-filter-dd {
         position: absolute; top: calc(100% + 6px); right: 0; z-index: 10000;
-        border-radius: 6px; overflow: hidden; min-width: 260px; max-width: 300px;
-        display: flex; flex-direction: column;
+        border-radius: 6px; flex-direction: column;
+        min-width: 260px; max-width: 300px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08);
       }
       #cfpm-sort-dd {
@@ -256,7 +278,8 @@
         border-radius: 7px; overflow: hidden; min-width: 210px;
         box-shadow: 0 6px 24px rgba(0,0,0,0.13), 0 1.5px 4px rgba(0,0,0,0.07);
       }
-      #cfpm-tag-list { overflow-y: auto; max-height: 150px; }
+
+      #cfpm-tag-list { overflow-y: auto; max-height: 110px; }
       #cfpm-tag-list::-webkit-scrollbar { width: 4px; }
       #cfpm-tag-list::-webkit-scrollbar-track { background: transparent; }
       #cfpm-tag-list::-webkit-scrollbar-thumb { border-radius: 2px; background: rgba(128,128,128,0.25); }
@@ -264,12 +287,11 @@
       .cfpm-rating-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
       .cfpm-rating-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
-      /* Tag search input */
       .cfpm-tag-search {
         width: 100%; box-sizing: border-box;
-        height: 28px; padding: 0 10px 0 28px;
+        height: 30px; padding: 0 10px 0 30px;
         font-size: 12px; font-family: inherit;
-        outline: none; border: none; border-bottom: 1px solid transparent;
+        outline: none; border: none;
         background: transparent;
       }
       .cfpm-tag-search-wrap {
@@ -279,7 +301,6 @@
         position: absolute; left: 9px; pointer-events: none; flex-shrink: 0;
       }
 
-      /* Add topic button */
       .cfpm-add-topic-btn {
         display: inline-flex; align-items: center; gap: 4px;
         height: 22px; padding: 0 8px; border-radius: 3px;
@@ -289,14 +310,6 @@
         transition: none !important;
       }
 
-      /* Topic picker panel */
-      .cfpm-topic-picker {
-        overflow: hidden;
-        transition: max-height 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.18s ease;
-        max-height: 0; opacity: 0;
-      }
-
-      /* Selected tag pills inside filter */
       .cfpm-filter-tag-pills {
         display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px 8px 12px;
       }
@@ -340,14 +353,12 @@
     if (isEnabled) {
       toggleBtn.classList.remove("collapsed");
       toggleBtn.title = "Collapse";
-      toggleBtn.style.color = theme.muted;
-      headerTitle.style.opacity = "0.8";
     } else {
       toggleBtn.classList.add("collapsed");
       toggleBtn.title = "Expand";
-      toggleBtn.style.color = theme.muted;
-      headerTitle.style.opacity = "0.4";
     }
+    toggleBtn.style.color = theme.muted;
+    headerTitle.style.opacity = isEnabled ? "0.8" : "0.4";
   }
   applyToggleVisuals();
 
@@ -373,7 +384,7 @@
   card.appendChild(headerDivider);
   card.appendChild(body);
 
-  // ── Controls row ──
+  // ── CONTROLS ROW ──
   const controlsRow = document.createElement("div");
   controlsRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;min-height:36px;margin-top:12px;";
 
@@ -384,7 +395,8 @@
   CATEGORIES.forEach(cat => {
     const b = document.createElement("button");
     b.className = "cfpm-cat-btn";
-    b.textContent = cat; b.dataset.cat = cat;
+    b.textContent = cat;
+    b.dataset.cat = cat;
     b.style.cssText = [`background:${theme.btnBg}`, `color:${theme.btnText}`, `border:1px solid ${theme.btnBorder}`, "cursor:pointer"].join(";");
     b.addEventListener("click", () => { renderCategory(cat); autoSave(); });
     categoryButtons[cat] = b;
@@ -398,6 +410,29 @@
     return `height:30px;padding:0 8px;border-radius:5px;border:1px solid ${theme.selectBorder};background:${theme.selectBg};color:${theme.selectText};font-size:12px;font-family:Arial,sans-serif;white-space:nowrap;outline:none;cursor:pointer;`;
   }
 
+  // ── TABLE TOGGLE BUTTON ──
+  const tableToggleBtn = document.createElement("button");
+  tableToggleBtn.className = "cfpm-icon-btn";
+  tableToggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="2" width="14" height="12" rx="1.5"/><path d="M1 6h14"/><path d="M1 10h14"/><path d="M5.5 6v8"/></svg>`;
+
+  function applyTableToggleBtnStyle() {
+    tableToggleBtn.title = tableVisible ? "Hide stats table" : "Show stats table";
+    tableToggleBtn.style.cssText = [
+      `background:${tableVisible ? theme.btnActiveBg : theme.btnBg}`,
+      `color:${tableVisible ? theme.btnActiveText : theme.muted}`,
+      `border:1px solid ${tableVisible ? theme.btnActiveBorder : theme.btnBorder}`,
+      "cursor:pointer"
+    ].join(";");
+  }
+  applyTableToggleBtnStyle();
+
+  tableToggleBtn.addEventListener("click", () => {
+    tableVisible = !tableVisible;
+    tableWrap.style.display = tableVisible ? "" : "none";
+    applyTableToggleBtnStyle();
+    autoSave();
+  });
+
   const timelineSelect = document.createElement("select");
   [
     { value: "all",    label: "All time"      },
@@ -409,7 +444,8 @@
     { value: "custom", label: "Custom range"  }
   ].forEach(opt => {
     const o = document.createElement("option");
-    o.value = opt.value; o.textContent = opt.label; timelineSelect.appendChild(o);
+    o.value = opt.value; o.textContent = opt.label;
+    timelineSelect.appendChild(o);
   });
   timelineSelect.value = DEFAULT_TIMELINE;
   timelineSelect.style.cssText = selectStyle() + "min-width:130px;";
@@ -427,7 +463,9 @@
     }
   });
   timelineSelect.addEventListener("click", () => {
-    if (timelineSelect.value === "custom" && timelineValueOnFocus === "custom") customDateRow.style.display = "flex";
+    if (timelineSelect.value === "custom" && timelineValueOnFocus === "custom") {
+      customDateRow.style.display = "flex";
+    }
   });
 
   const modeSelect = document.createElement("select");
@@ -436,45 +474,56 @@
     { value: "rated",   label: "Rated"   },
     { value: "unrated", label: "Unrated" }
   ].forEach(opt => {
-    const o = document.createElement("option"); o.value = opt.value; o.textContent = opt.label; modeSelect.appendChild(o);
+    const o = document.createElement("option");
+    o.value = opt.value; o.textContent = opt.label;
+    modeSelect.appendChild(o);
   });
   modeSelect.value = DEFAULT_MODE;
   modeSelect.style.cssText = selectStyle() + "min-width:90px;";
   modeSelect.addEventListener("change", () => { renderCategory(currentCategory || DEFAULT_CATEGORY); autoSave(); });
 
+  rightControls.appendChild(tableToggleBtn);
   rightControls.appendChild(timelineSelect);
   rightControls.appendChild(modeSelect);
   controlsRow.appendChild(leftControls);
   controlsRow.appendChild(rightControls);
   body.appendChild(controlsRow);
 
-  // ── Custom date row ──
+  // ── CUSTOM DATE ROW ──
   const customDateRow = document.createElement("div");
   customDateRow.style.cssText = `display:none;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;background:${theme.dropdownSection};border:1px solid ${theme.borderLight};border-radius:5px;flex-wrap:wrap;`;
 
   const dateFromLabel = document.createElement("span");
   dateFromLabel.textContent = "From";
   dateFromLabel.style.cssText = `color:${theme.muted};font-size:12px;font-weight:600;white-space:nowrap;`;
+
   const startDateInput = document.createElement("input");
-  startDateInput.type = "date"; startDateInput.value = DEFAULT_CUSTOM_START;
+  startDateInput.type = "date";
+  startDateInput.value = DEFAULT_CUSTOM_START;
   startDateInput.style.cssText = `height:30px;padding:0 8px;border-radius:5px;border:1px solid ${theme.inputBorder};background:${theme.inputBg};color:${theme.inputText};font-size:12px;flex:1 1 130px;min-width:130px;max-width:170px;color-scheme:${detectDarkMode()?"dark":"light"};outline:none;`;
+
   const dateToLabel = document.createElement("span");
   dateToLabel.textContent = "To";
   dateToLabel.style.cssText = `color:${theme.muted};font-size:12px;font-weight:600;white-space:nowrap;`;
+
   const endDateInput = document.createElement("input");
-  endDateInput.type = "date"; endDateInput.value = DEFAULT_CUSTOM_END;
+  endDateInput.type = "date";
+  endDateInput.value = DEFAULT_CUSTOM_END;
   endDateInput.style.cssText = `height:30px;padding:0 8px;border-radius:5px;border:1px solid ${theme.inputBorder};background:${theme.inputBg};color:${theme.inputText};font-size:12px;flex:1 1 130px;min-width:130px;max-width:170px;color-scheme:${detectDarkMode()?"dark":"light"};outline:none;`;
 
   const dateButtonGroup = document.createElement("div");
   dateButtonGroup.style.cssText = "display:flex;gap:6px;margin-left:auto;align-items:center;";
+
   const applyDateBtn = document.createElement("button");
   applyDateBtn.className = "cfpm-pill-btn";
   applyDateBtn.textContent = "Apply";
   applyDateBtn.style.cssText = `background:${theme.btnActiveBg};color:${theme.btnActiveText};border:1px solid ${theme.btnActiveBorder};cursor:pointer;`;
+
   const cancelDateBtn = document.createElement("button");
   cancelDateBtn.className = "cfpm-pill-btn";
   cancelDateBtn.textContent = "Cancel";
   cancelDateBtn.style.cssText = `background:${theme.btnBg};color:${theme.btnText};border:1px solid ${theme.btnBorder};cursor:pointer;`;
+
   const dateValidationMsg = document.createElement("span");
   dateValidationMsg.style.cssText = "color:#e74c3c;font-size:11px;font-weight:600;display:none;white-space:nowrap;";
   dateValidationMsg.textContent = "Select both dates.";
@@ -482,8 +531,10 @@
   dateButtonGroup.appendChild(dateValidationMsg);
   dateButtonGroup.appendChild(applyDateBtn);
   dateButtonGroup.appendChild(cancelDateBtn);
-  customDateRow.appendChild(dateFromLabel); customDateRow.appendChild(startDateInput);
-  customDateRow.appendChild(dateToLabel);   customDateRow.appendChild(endDateInput);
+  customDateRow.appendChild(dateFromLabel);
+  customDateRow.appendChild(startDateInput);
+  customDateRow.appendChild(dateToLabel);
+  customDateRow.appendChild(endDateInput);
   customDateRow.appendChild(dateButtonGroup);
   body.appendChild(customDateRow);
 
@@ -496,8 +547,11 @@
       lastAppliedCustomEnd   = endDateInput.value;
       autoSave();
       renderCategory(currentCategory || DEFAULT_CATEGORY);
-    } else { dateValidationMsg.style.display = "inline"; }
+    } else {
+      dateValidationMsg.style.display = "inline";
+    }
   });
+
   cancelDateBtn.addEventListener("click", () => {
     customDateRow.style.display = "none";
     dateValidationMsg.style.display = "none";
@@ -514,6 +568,7 @@
 
   const tableWrap = document.createElement("div");
   tableWrap.style.cssText = "overflow-x:auto;margin-bottom:12px;";
+  tableWrap.style.display = tableVisible ? "" : "none";
   const table = document.createElement("table");
   table.style.cssText = "border-collapse:collapse;font-size:13px;width:100%;";
   tableWrap.appendChild(table);
@@ -521,57 +576,114 @@
 
   const frictionSection = document.createElement("div");
   frictionSection.style.cssText = `margin-top:10px;border-top:1px solid ${theme.borderLight};padding-top:10px;`;
+
   const frictionScrollBox = document.createElement("div");
   frictionScrollBox.style.cssText = [
-    "height:305px", "overflow:hidden", `border:1px solid ${theme.borderLight}`,
-    "border-radius:5px", "display:flex", "flex-direction:column", "padding:0"
+    "height:260px", "overflow:visible",
+    `border:1px solid ${theme.borderLight}`,
+    "border-radius:5px", "display:flex", "flex-direction:column", "padding:0",
+    "position:relative"
   ].join(";");
+
   frictionSection.appendChild(frictionScrollBox);
   body.appendChild(frictionSection);
 
+  function autoSave() {
+    saveSettings({
+      category:     currentCategory || DEFAULT_CATEGORY,
+      timeline:     savedTimeline,
+      mode:         modeSelect.value,
+      sortMode:     defaultSortMode,
+      hideAC:       hideAC,
+      hideTags:     hideTagsGlobal,
+      hideRatings:  hideRatingsGlobal,
+      solvedOnly:   solvedOnlyGlobal,
+      minAttempts:  minAttemptsGlobal,
+      ratingMin:    ratingMinGlobal,
+      ratingMax:    ratingMaxGlobal,
+      customStart:  startDateInput ? startDateInput.value : "",
+      customEnd:    endDateInput   ? endDateInput.value   : "",
+      tagFilters:   Array.from(activeTagFilters),
+      tableVisible: tableVisible,
+    });
+  }
+
   function insertCard() {
-    const visible = Array.from(document.querySelectorAll(".box")).filter(el => { const r = el.getBoundingClientRect(); return r.width > 220 && r.height > 50; });
+    const visible = Array.from(document.querySelectorAll(".box")).filter(el => {
+      const r = el.getBoundingClientRect();
+      return r.width > 220 && r.height > 50;
+    });
     if (visible.length > 0) {
       const last = visible[visible.length - 1];
       card.style.width = Math.round(last.getBoundingClientRect().width) + "px";
       last.insertAdjacentElement("afterend", card);
-      if (window.ResizeObserver) new ResizeObserver(entries => { for (const e of entries) { const nw = Math.round(e.contentRect.width); if (nw > 220) card.style.width = nw + "px"; }}).observe(last);
+      if (window.ResizeObserver) {
+        new ResizeObserver(entries => {
+          for (const e of entries) {
+            const nw = Math.round(e.contentRect.width);
+            if (nw > 220) card.style.width = nw + "px";
+          }
+        }).observe(last);
+      }
       return;
     }
     const main = document.querySelector("#pageContent, #mainContent, .mainContent, .content");
     if (main) {
       card.style.width = Math.round(main.getBoundingClientRect().width) + "px";
       main.appendChild(card);
-      if (window.ResizeObserver) new ResizeObserver(entries => { for (const e of entries) { const nw = Math.round(e.contentRect.width); if (nw > 220) card.style.width = nw + "px"; }}).observe(main);
+      if (window.ResizeObserver) {
+        new ResizeObserver(entries => {
+          for (const e of entries) {
+            const nw = Math.round(e.contentRect.width);
+            if (nw > 220) card.style.width = nw + "px";
+          }
+        }).observe(main);
+      }
       return;
     }
-    document.body.appendChild(card); card.style.width = "880px";
+    document.body.appendChild(card);
+    card.style.width = "880px";
   }
   insertCard();
 
   let previousTheme = { isDark: detectDarkMode(), bg: theme.bg, border: theme.border };
 
   function applyTheme() {
-    card.style.background = theme.bg; card.style.border = `1px solid ${theme.border}`; card.style.color = theme.text;
+    card.style.background = theme.bg;
+    card.style.border = `1px solid ${theme.border}`;
+    card.style.color = theme.text;
     headerDivider.style.background = theme.borderLight;
     info.style.color = theme.muted;
     frictionSection.style.borderTop = `1px solid ${theme.borderLight}`;
-    frictionScrollBox.style.border = `1px solid ${theme.borderLight}`;
+    frictionScrollBox.style.borderColor = theme.borderLight;
     timelineSelect.style.cssText = selectStyle() + "min-width:130px;";
     modeSelect.style.cssText = selectStyle() + "min-width:90px;";
-    customDateRow.style.background = theme.dropdownSection; customDateRow.style.borderColor = theme.borderLight;
-    dateFromLabel.style.color = theme.muted; dateToLabel.style.color = theme.muted;
+    customDateRow.style.background = theme.dropdownSection;
+    customDateRow.style.borderColor = theme.borderLight;
+    dateFromLabel.style.color = theme.muted;
+    dateToLabel.style.color = theme.muted;
     const cs = detectDarkMode() ? "dark" : "light";
-    startDateInput.style.colorScheme = cs; endDateInput.style.colorScheme = cs;
-    startDateInput.style.background = theme.inputBg; startDateInput.style.color = theme.inputText; startDateInput.style.borderColor = theme.inputBorder;
-    endDateInput.style.background   = theme.inputBg; endDateInput.style.color   = theme.inputText; endDateInput.style.borderColor   = theme.inputBorder;
-    applyDateBtn.style.background = theme.btnActiveBg; applyDateBtn.style.color = theme.btnActiveText; applyDateBtn.style.borderColor = theme.btnActiveBorder;
-    cancelDateBtn.style.background = theme.btnBg; cancelDateBtn.style.color = theme.btnText; cancelDateBtn.style.borderColor = theme.btnBorder;
+    startDateInput.style.colorScheme = cs;
+    endDateInput.style.colorScheme = cs;
+    startDateInput.style.background = theme.inputBg;
+    startDateInput.style.color = theme.inputText;
+    startDateInput.style.borderColor = theme.inputBorder;
+    endDateInput.style.background = theme.inputBg;
+    endDateInput.style.color = theme.inputText;
+    endDateInput.style.borderColor = theme.inputBorder;
+    applyDateBtn.style.background = theme.btnActiveBg;
+    applyDateBtn.style.color = theme.btnActiveText;
+    applyDateBtn.style.borderColor = theme.btnActiveBorder;
+    cancelDateBtn.style.background = theme.btnBg;
+    cancelDateBtn.style.color = theme.btnText;
+    cancelDateBtn.style.borderColor = theme.btnBorder;
     headerTitle.style.color = theme.muted;
     toggleBtn.style.color = theme.muted;
     applyToggleVisuals();
+    applyTableToggleBtnStyle();
     Object.keys(categoryButtons).forEach(k => {
-      const b = categoryButtons[k], active = k === currentCategory;
+      const b = categoryButtons[k];
+      const active = k === currentCategory;
       b.style.background  = active ? theme.btnActiveBg : theme.btnBg;
       b.style.color       = active ? theme.btnActiveText : theme.btnText;
       b.style.borderColor = active ? theme.btnActiveBorder : theme.btnBorder;
@@ -579,8 +691,13 @@
   }
 
   function updateTheme() {
-    const newIsDark = detectDarkMode(), newTheme = createTheme();
-    if (newIsDark !== previousTheme.isDark || newTheme.bg !== previousTheme.bg || newTheme.border !== previousTheme.border) {
+    const newIsDark = detectDarkMode();
+    const newTheme = createTheme();
+    if (
+      newIsDark !== previousTheme.isDark ||
+      newTheme.bg !== previousTheme.bg ||
+      newTheme.border !== previousTheme.border
+    ) {
       theme = newTheme;
       previousTheme = { isDark: newIsDark, bg: theme.bg, border: theme.border };
       applyTheme();
@@ -592,10 +709,13 @@
   }
 
   setTimeout(applyTheme, 100);
+
   const themeObserver = new MutationObserver(updateTheme);
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class','style','data-theme'] });
   themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class','style','data-theme'] });
-  ['.info','.roundbox','#pageContent'].map(sel => document.querySelector(sel)).filter(Boolean)
+  ['.info', '.roundbox', '#pageContent']
+    .map(sel => document.querySelector(sel))
+    .filter(Boolean)
     .forEach(el => themeObserver.observe(el, { attributes: true, attributeFilter: ['style','class'] }));
 
   if (window._cfpmThemeInterval) clearInterval(window._cfpmThemeInterval);
@@ -604,11 +724,14 @@
 
   function median(arr) {
     if (!arr || !arr.length) return null;
-    const s = arr.slice().sort((a, b) => a - b), m = Math.floor(s.length / 2);
-    return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
+    const s = arr.slice().sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }
 
-  function totalErrors(p) { return (p.wa||0) + (p.tle||0) + (p.rte||0) + (p.mle||0) + (p.other||0); }
+  function totalErrors(p) {
+    return (p.wa || 0) + (p.tle || 0) + (p.rte || 0) + (p.mle || 0) + (p.other || 0);
+  }
 
   function getRatingColor(r) {
     if (!r || r < 1200) return "#808080";
@@ -628,7 +751,7 @@
     if (typeof timelineValue === 'object' && timelineValue.type === 'custom') {
       if (timelineValue.start && timelineValue.end) {
         cutoffTime = new Date(timelineValue.start).getTime() / 1000;
-        endTime    = new Date(timelineValue.end).getTime()   / 1000 + 86399;
+        endTime    = new Date(timelineValue.end).getTime() / 1000 + 86399;
       }
     } else if (timelineValue !== "all") {
       cutoffTime = nowSec - parseInt(timelineValue) * 30 * 24 * 3600;
@@ -681,16 +804,22 @@
       const res = await fetch("https://codeforces.com/api/contest.list");
       const json = await res.json();
       if (json.status === "OK") json.result.forEach(c => { contestMap[c.id] = c; });
-    } catch(e) { info.textContent = "Contest list unavailable — some data may be incomplete."; }
+    } catch(e) {
+      info.textContent = "Contest list unavailable — some data may be incomplete.";
+    }
   }
 
   async function fetchRatedSet(handle) {
     try {
       const r = await fetch(`https://codeforces.com/api/user.rating?handle=${handle}`);
       const d = await r.json();
-      if (d.status === "OK") { userRatingHistory = d.result || []; return new Set(d.result.map(x => x.contestId)); }
+      if (d.status === "OK") {
+        userRatingHistory = d.result || [];
+        return new Set(d.result.map(x => x.contestId));
+      }
     } catch(e) {}
-    userRatingHistory = []; return new Set();
+    userRatingHistory = [];
+    return new Set();
   }
 
   async function fetchAndStore(handle) {
@@ -698,13 +827,20 @@
       info.textContent = "Fetching your submissions from Codeforces…";
       const r = await fetch(`https://codeforces.com/api/user.status?handle=${handle}&count=10000`);
       const d = await r.json();
-      if (d.status !== "OK") { info.textContent = "Codeforces returned an error: " + (d.comment || "unknown"); return false; }
+      if (d.status !== "OK") {
+        info.textContent = "Codeforces returned an error: " + (d.comment || "unknown");
+        return false;
+      }
       rawSubmissions = d.result || [];
       ratedContestSet = await fetchRatedSet(handle);
       return true;
-    } catch(e) { info.textContent = "Could not connect to Codeforces. Please check your connection and try again."; return false; }
+    } catch(e) {
+      info.textContent = "Could not connect to Codeforces. Please check your connection and try again.";
+      return false;
+    }
   }
 
+  // ── CORE CALCULATION ──
   function recalcForMode(mode, timelineMonths) {
     const now = Math.floor(Date.now() / 1000);
     let cutoffTime = 0, endTime = now;
@@ -720,20 +856,27 @@
 
     const filteredSubmissions = (cutoffTime === 0 && endTime === now)
       ? rawSubmissions
-      : rawSubmissions.filter(s => s.creationTimeSeconds && s.creationTimeSeconds >= cutoffTime && s.creationTimeSeconds <= endTime);
+      : rawSubmissions.filter(s =>
+          s.creationTimeSeconds &&
+          s.creationTimeSeconds >= cutoffTime &&
+          s.creationTimeSeconds <= endTime
+        );
 
     const inWindowSet = new Set();
     filteredSubmissions.forEach(s => {
       if (!s.problem) return;
-      const cid = s.problem.contestId, c = contestMap[cid];
+      const cid = s.problem.contestId;
+      const c = contestMap[cid];
       if (!c || typeof c.startTimeSeconds !== "number" || typeof c.durationSeconds !== "number") return;
-      const st = s.creationTimeSeconds, start = c.startTimeSeconds, end = start + c.durationSeconds;
+      const st = s.creationTimeSeconds;
+      const start = c.startTimeSeconds;
+      const end = start + c.durationSeconds;
       if (typeof st === "number" && st >= start && st <= end) inWindowSet.add(cid);
     });
 
     let participated = new Set();
-    if (mode === "total")      participated = new Set([...ratedContestSet, ...inWindowSet]);
-    else if (mode === "rated") participated = new Set([...ratedContestSet]);
+    if (mode === "total")       participated = new Set([...ratedContestSet, ...inWindowSet]);
+    else if (mode === "rated")  participated = new Set([...ratedContestSet]);
     else inWindowSet.forEach(cid => { if (!ratedContestSet.has(cid)) participated.add(cid); });
 
     if (cutoffTime !== 0 || endTime !== now) {
@@ -745,60 +888,19 @@
       participated = tmp;
     }
 
-    const categoryIndexTimes = {}, categoryIndexAttempts = {}, categoryIndexSolved = {};
-    const categoryContestCount = {}, categoryRawWAMap = {};
+    const categoryIndexTimes    = {};
+    const categoryIndexAttempts = {};
+    const categoryIndexSolved   = {};
+    const categoryContestCount  = {};
     CATEGORIES.forEach(c => {
-      categoryIndexTimes[c] = {}; categoryIndexAttempts[c] = {}; categoryIndexSolved[c] = {};
-      categoryContestCount[c] = new Set(); categoryRawWAMap[c] = new Map();
+      categoryIndexTimes[c]    = {};
+      categoryIndexAttempts[c] = {};
+      categoryIndexSolved[c]   = {};
+      categoryContestCount[c]  = new Set();
     });
 
-    const practiceRawWAMap = new Map();
-    const unofficialContests = new Set();
-    participated.forEach(cid => { if (!ratedContestSet.has(cid)) unofficialContests.add(cid); });
-
-    const everAC = new Set();
-    rawSubmissions.forEach(s => { if (s.verdict === "OK" && s.problem) everAC.add(s.problem.contestId + "-" + s.problem.index); });
-
-    filteredSubmissions.forEach(s => {
-      if (!s.problem) return;
-      const cid = s.problem.contestId;
-      if (!participated.has(cid)) return;
-      const contest = contestMap[cid];
-      if (!contest || typeof contest.startTimeSeconds !== "number" || typeof contest.durationSeconds !== "number") return;
-      const start = contest.startTimeSeconds, end = start + contest.durationSeconds, st = s.creationTimeSeconds;
-      if (typeof st !== "number" || st < start || st > end) return;
-
-      const idx = s.problem.index, pid = cid + "-" + idx;
-      const tags = s.problem.tags || [];
-      let cat = classifyContest(contest);
-      if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contest, unofficialContests.has(cid));
-      if (!categoryRawWAMap[cat]) cat = "Other";
-      if (!categoryRawWAMap[cat]) return;
-
-      const info_ = { pid, name: s.problem.name||idx, contestId: cid, contestName: contest.name||("Contest "+cid), index: idx, rating: s.problem.rating||null, tags: tags.slice(), solved: everAC.has(pid), wa:0, tle:0, rte:0, mle:0, other:0 };
-      if (!categoryRawWAMap[cat].has(pid)) categoryRawWAMap[cat].set(pid, { ...info_ });
-      categoryRawWAMap[cat].get(pid).solved = everAC.has(pid);
-    });
-
-    filteredSubmissions.forEach(s => {
-      if (!s.problem) return;
-      const cid = s.problem.contestId;
-      const contest = contestMap[cid];
-      const tags = s.problem.tags || [];
-      const idx = s.problem.index, pid = cid + "-" + idx;
-      const contestName = contest ? (contest.name || ("Contest " + cid)) : ("Contest " + cid);
-
-      let duringContest = false;
-      if (contest && typeof contest.startTimeSeconds === "number" && typeof contest.durationSeconds === "number") {
-        const start = contest.startTimeSeconds, end = start + contest.durationSeconds, st = s.creationTimeSeconds;
-        if (typeof st === "number" && st >= start && st <= end) duringContest = true;
-      }
-      if (duringContest) return;
-
-      const mkInfo = () => ({ pid, name: s.problem.name||idx, contestId: cid, contestName, index: idx, rating: s.problem.rating||null, tags: tags.slice(), solved: everAC.has(pid), wa:0, tle:0, rte:0, mle:0, other:0 });
-      if (!practiceRawWAMap.has(pid)) practiceRawWAMap.set(pid, mkInfo());
-      practiceRawWAMap.get(pid).solved = everAC.has(pid);
-    });
+    const unofficialForTable = new Set();
+    participated.forEach(cid => { if (!ratedContestSet.has(cid)) unofficialForTable.add(cid); });
 
     const firstACSet = new Set();
     filteredSubmissions.forEach(s => {
@@ -807,76 +909,200 @@
       if (!participated.has(cid)) return;
       const contest = contestMap[cid];
       if (!contest || typeof contest.startTimeSeconds !== "number" || typeof contest.durationSeconds !== "number") return;
-      const start = contest.startTimeSeconds, end = start + contest.durationSeconds, st = s.creationTimeSeconds;
+      const start = contest.startTimeSeconds;
+      const end   = start + contest.durationSeconds;
+      const st    = s.creationTimeSeconds;
       if (typeof st !== "number" || st < start || st > end) return;
 
-      const idx = s.problem.index, pid = cid + "-" + idx;
+      const idx = s.problem.index;
+      const pid = cid + "-" + idx;
       let cat = classifyContest(contest);
-      if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contest, unofficialContests.has(cid));
+      if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contest, unofficialForTable.has(cid));
       if (!categoryIndexAttempts[cat]) {
         cat = "Other";
         if (!categoryIndexAttempts[cat]) {
-          categoryIndexAttempts[cat]={}; categoryIndexTimes[cat]={}; categoryIndexSolved[cat]={};
-          categoryRawWAMap[cat]=new Map(); categoryContestCount[cat]=new Set();
+          categoryIndexAttempts[cat] = {};
+          categoryIndexTimes[cat]    = {};
+          categoryIndexSolved[cat]   = {};
+          categoryContestCount[cat]  = new Set();
         }
       }
 
       categoryContestCount[cat].add(cid);
-      categoryIndexAttempts[cat][idx] = (categoryIndexAttempts[cat][idx]||0) + 1;
-      categoryIndexTimes[cat][idx] = categoryIndexTimes[cat][idx] || [];
+      categoryIndexAttempts[cat][idx] = (categoryIndexAttempts[cat][idx] || 0) + 1;
+      categoryIndexTimes[cat][idx]    = categoryIndexTimes[cat][idx] || [];
 
       if (s.verdict !== "OK") return;
       if (firstACSet.has(pid)) return;
       firstACSet.add(pid);
-      categoryIndexSolved[cat][idx] = (categoryIndexSolved[cat][idx]||0)+1;
-      const timeMin = (st - start) / 60, maxAllowed = Math.max(1, Math.round(contest.durationSeconds / 60));
+      categoryIndexSolved[cat][idx] = (categoryIndexSolved[cat][idx] || 0) + 1;
+      const timeMin    = (st - start) / 60;
+      const maxAllowed = Math.max(1, Math.round(contest.durationSeconds / 60));
       if (timeMin >= 0 && timeMin <= maxAllowed) categoryIndexTimes[cat][idx].push(timeMin);
     });
 
+    const everAC = new Set();
+    rawSubmissions.forEach(s => {
+      if (s.verdict === "OK" && s.problem) everAC.add(s.problem.contestId + "-" + s.problem.index);
+    });
+
+    const inContestCids = new Set();
     filteredSubmissions.forEach(s => {
-      if (!s.problem || s.verdict === "OK") return;
+      if (!s.problem) return;
       const cid = s.problem.contestId;
-      if (!participated.has(cid)) return;
       const contest = contestMap[cid];
       if (!contest || typeof contest.startTimeSeconds !== "number" || typeof contest.durationSeconds !== "number") return;
-      const start = contest.startTimeSeconds, end = start + contest.durationSeconds, st = s.creationTimeSeconds;
+      const start = contest.startTimeSeconds;
+      const end   = start + contest.durationSeconds;
+      const st    = s.creationTimeSeconds;
+      if (typeof st === "number" && st >= start && st <= end) inContestCids.add(cid);
+    });
+
+    const unofficialForList = new Set();
+    inContestCids.forEach(cid => { if (!ratedContestSet.has(cid)) unofficialForList.add(cid); });
+
+    const categoryRawWAMap = {};
+    CATEGORIES.forEach(c => { categoryRawWAMap[c] = new Map(); });
+
+    filteredSubmissions.forEach(s => {
+      if (!s.problem) return;
+      const cid = s.problem.contestId;
+      if (!inContestCids.has(cid)) return;
+      const contest = contestMap[cid];
+      if (!contest) return;
+      const start = contest.startTimeSeconds;
+      const end   = start + contest.durationSeconds;
+      const st    = s.creationTimeSeconds;
       if (typeof st !== "number" || st < start || st > end) return;
-      const pid = cid + "-" + s.problem.index;
-      const vtype = s.verdict === "WRONG_ANSWER" ? "wa" : s.verdict === "TIME_LIMIT_EXCEEDED" ? "tle" : s.verdict === "RUNTIME_ERROR" ? "rte" : s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle" : "other";
-      let cat = classifyContest(contestMap[cid]);
-      if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contestMap[cid], unofficialContests.has(cid));
+
+      const idx  = s.problem.index;
+      const pid  = cid + "-" + idx;
+      const tags = s.problem.tags || [];
+      let cat = classifyContest(contest);
+      if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contest, unofficialForList.has(cid));
       if (!categoryRawWAMap[cat]) cat = "Other";
       if (!categoryRawWAMap[cat]) return;
-      if (categoryRawWAMap[cat].has(pid)) categoryRawWAMap[cat].get(pid)[vtype]++;
+
+      if (!categoryRawWAMap[cat].has(pid)) {
+        categoryRawWAMap[cat].set(pid, {
+          pid,
+          name: s.problem.name || idx,
+          contestId: cid,
+          contestName: contest.name || ("Contest " + cid),
+          index: idx,
+          rating: s.problem.rating || null,
+          tags: tags.slice(),
+          solved: everAC.has(pid),
+          wa: 0, tle: 0, rte: 0, mle: 0, other: 0
+        });
+      }
     });
 
     filteredSubmissions.forEach(s => {
       if (!s.problem || s.verdict === "OK") return;
       const cid = s.problem.contestId;
+      if (!inContestCids.has(cid)) return;
       const contest = contestMap[cid];
-      let duringContest = false;
-      if (contest && typeof contest.startTimeSeconds === "number" && typeof contest.durationSeconds === "number") {
-        const start = contest.startTimeSeconds, end = start + contest.durationSeconds, st = s.creationTimeSeconds;
-        if (typeof st === "number" && st >= start && st <= end) duringContest = true;
-      }
-      if (duringContest) return;
+      if (!contest) return;
+      const start = contest.startTimeSeconds;
+      const end   = start + contest.durationSeconds;
+      const st    = s.creationTimeSeconds;
+      if (typeof st !== "number" || st < start || st > end) return;
+
       const pid = cid + "-" + s.problem.index;
-      if (!practiceRawWAMap.has(pid)) return;
-      const vtype = s.verdict === "WRONG_ANSWER" ? "wa" : s.verdict === "TIME_LIMIT_EXCEEDED" ? "tle" : s.verdict === "RUNTIME_ERROR" ? "rte" : s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle" : "other";
-      practiceRawWAMap.get(pid)[vtype]++;
+      let cat = classifyContest(contest);
+      if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contest, unofficialForList.has(cid));
+      if (!categoryRawWAMap[cat]) cat = "Other";
+      if (!categoryRawWAMap[cat] || !categoryRawWAMap[cat].has(pid)) return;
+
+      const vtype =
+        s.verdict === "WRONG_ANSWER"          ? "wa"  :
+        s.verdict === "TIME_LIMIT_EXCEEDED"   ? "tle" :
+        s.verdict === "RUNTIME_ERROR"         ? "rte" :
+        s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle" : "other";
+      categoryRawWAMap[cat].get(pid)[vtype]++;
     });
 
     const categoryRawProblems = {};
     CATEGORIES.forEach(c => {
-      categoryRawProblems[c] = Array.from((categoryRawWAMap[c]||new Map()).values()).filter(p => totalErrors(p) > 0);
+      categoryRawProblems[c] = Array.from((categoryRawWAMap[c] || new Map()).values())
+        .filter(p => totalErrors(p) > 0);
     });
+
+    const practiceRawWAMap = new Map();
+
+    filteredSubmissions.forEach(s => {
+      if (!s.problem) return;
+      const cid = s.problem.contestId;
+      const contest = contestMap[cid];
+      if (!contest) return;
+
+      let duringContest = false;
+      if (typeof contest.startTimeSeconds === "number" && typeof contest.durationSeconds === "number") {
+        const start = contest.startTimeSeconds;
+        const end   = start + contest.durationSeconds;
+        const st    = s.creationTimeSeconds;
+        if (typeof st === "number" && st >= start && st <= end) duringContest = true;
+      }
+      if (duringContest) return;
+
+      const idx  = s.problem.index;
+      const pid  = cid + "-" + idx;
+      const tags = s.problem.tags || [];
+
+      if (!practiceRawWAMap.has(pid)) {
+        practiceRawWAMap.set(pid, {
+          pid,
+          name: s.problem.name || idx,
+          contestId: cid,
+          contestName: contest.name || ("Contest " + cid),
+          index: idx,
+          rating: s.problem.rating || null,
+          tags: tags.slice(),
+          solved: everAC.has(pid),
+          wa: 0, tle: 0, rte: 0, mle: 0, other: 0
+        });
+      }
+    });
+
+    filteredSubmissions.forEach(s => {
+      if (!s.problem || s.verdict === "OK") return;
+      const cid = s.problem.contestId;
+      const contest = contestMap[cid];
+      if (!contest) return;
+
+      let duringContest = false;
+      if (typeof contest.startTimeSeconds === "number" && typeof contest.durationSeconds === "number") {
+        const start = contest.startTimeSeconds;
+        const end   = start + contest.durationSeconds;
+        const st    = s.creationTimeSeconds;
+        if (typeof st === "number" && st >= start && st <= end) duringContest = true;
+      }
+      if (duringContest) return;
+
+      const pid = cid + "-" + s.problem.index;
+      if (!practiceRawWAMap.has(pid)) return;
+
+      const vtype =
+        s.verdict === "WRONG_ANSWER"          ? "wa"  :
+        s.verdict === "TIME_LIMIT_EXCEEDED"   ? "tle" :
+        s.verdict === "RUNTIME_ERROR"         ? "rte" :
+        s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle" : "other";
+      practiceRawWAMap.get(pid)[vtype]++;
+    });
+
     const practiceRawProblems = Array.from(practiceRawWAMap.values()).filter(p => totalErrors(p) > 0);
 
     return {
-      categoryIndexTimes, categoryIndexAttempts, categoryIndexSolved,
-      categoryRawProblems, practiceRawProblems,
+      categoryIndexTimes,
+      categoryIndexAttempts,
+      categoryIndexSolved,
+      categoryRawProblems,
+      practiceRawProblems,
       participatedCount: participated.size,
-      categoryContestCount: Object.fromEntries(Object.entries(categoryContestCount).map(([c, s]) => [c, s.size]))
+      categoryContestCount: Object.fromEntries(
+        Object.entries(categoryContestCount).map(([c, s]) => [c, s.size])
+      )
     };
   }
 
@@ -884,29 +1110,48 @@
   function buildTagChips(tags, isDark, muted) {
     const tw = document.createElement("span");
     tw.style.cssText = "display:flex;gap:3px;flex-wrap:nowrap;flex-shrink:0;align-items:center;";
-    const visible = tags.slice(0, MAX_VISIBLE_TAGS), hidden = tags.length - visible.length;
+    const visible = tags.slice(0, MAX_VISIBLE_TAGS);
+    const hidden  = tags.length - visible.length;
     visible.forEach(tag => {
       const chip = document.createElement("span");
       chip.textContent = tag;
-      chip.style.cssText = [`background:${isDark ? "#1e2e40" : "#e8f0fe"}`, `color:${isDark ? "#7aabff" : "#1a56c4"}`, "font-size:10px", "border-radius:3px", "padding:1px 5px", "white-space:nowrap", "flex-shrink:0"].join(";");
+      chip.style.cssText = [
+        `background:${isDark ? "#1e2e40" : "#e8f0fe"}`,
+        `color:${isDark ? "#7aabff" : "#1a56c4"}`,
+        "font-size:10px", "border-radius:3px", "padding:1px 5px",
+        "white-space:nowrap", "flex-shrink:0"
+      ].join(";");
       tw.appendChild(chip);
     });
     if (hidden > 0) {
       const more = document.createElement("span");
-      more.textContent = `+${hidden}`; more.title = tags.slice(MAX_VISIBLE_TAGS).join(", ");
-      more.style.cssText = [`background:${isDark ? "#2e2e2e" : "#eee"}`, `color:${muted}`, "font-size:10px", "border-radius:3px", "padding:1px 5px", "white-space:nowrap", "flex-shrink:0", "cursor:default"].join(";");
+      more.textContent = `+${hidden}`;
+      more.title = tags.slice(MAX_VISIBLE_TAGS).join(", ");
+      more.style.cssText = [
+        `background:${isDark ? "#2e2e2e" : "#eee"}`,
+        `color:${muted}`,
+        "font-size:10px", "border-radius:3px", "padding:1px 5px",
+        "white-space:nowrap", "flex-shrink:0", "cursor:default"
+      ].join(";");
       tw.appendChild(more);
     }
     return tw;
   }
 
-  // ── MAIN FRICTION PANELS RENDERER ──
+  // ── FRICTION PANELS ──
   function renderFrictionPanels(modeData, cat) {
     frictionScrollBox.innerHTML = "";
+    frictionScrollBox.style.cssText = [
+      "height:260px", "overflow:visible",
+      `border:1px solid ${theme.borderLight}`,
+      "border-radius:5px", "display:flex", "flex-direction:column", "padding:0",
+      "position:relative"
+    ].join(";");
 
     let activeTab        = frictionActiveTab;
     let sortMode         = defaultSortMode;
     let localHideAC      = hideAC;
+    let localSolvedOnly  = solvedOnlyGlobal;
     let localHideTags    = hideTagsGlobal;
     let localHideRatings = hideRatingsGlobal;
     let localMinAttempts = minAttemptsGlobal;
@@ -914,8 +1159,10 @@
     let localRatingMax   = ratingMaxGlobal;
     let localTagFilters  = new Set(activeTagFilters);
 
-    let availableTags = [];
-    let filterOpen = false, sortOpen = false, viewOpen = false;
+    let availableTags  = [];
+    let filterOpen     = false;
+    let sortOpen       = false;
+    let viewOpen       = false;
     let topicPickerOpen = false;
 
     function getProblems() {
@@ -929,6 +1176,7 @@
       const rMax = localRatingMax !== "" && !isNaN(parseInt(localRatingMax)) ? parseInt(localRatingMax) : null;
       return problems
         .filter(p => totalErrors(p) >= localMinAttempts)
+        .filter(p => !localSolvedOnly || p.solved)
         .filter(p => !localHideAC || !p.solved)
         .filter(p => localTagFilters.size === 0 || [...localTagFilters].every(t => (p.tags || []).includes(t)))
         .filter(p => {
@@ -950,11 +1198,13 @@
     const topBar = document.createElement("div");
     topBar.style.cssText = [
       "display:flex", "align-items:center", "justify-content:space-between",
-      `border-bottom:1px solid ${theme.borderLight}`, "min-height:42px",
-      "padding:0 10px 0 12px", "flex-shrink:0", "gap:8px"
+      `border-bottom:1px solid ${theme.borderLight}`,
+      "min-height:42px", "padding:0 10px 0 12px",
+      "flex-shrink:0", "gap:8px",
+      `background:${theme.bg}`, "border-radius:5px 5px 0 0"
     ].join(";");
 
-    // ── SEGMENTED SOURCE CONTROL ──
+    // ── SOURCE SEGMENTED CONTROL ──
     const segWrap = document.createElement("div");
     segWrap.style.cssText = `display:flex;align-items:center;background:${theme.borderLighter};border-radius:5px;padding:3px;gap:2px;flex-shrink:0;`;
 
@@ -987,10 +1237,8 @@
     }
 
     function updateSourceCounts() {
-      const contestProblems  = modeData.categoryRawProblems?.[cat] || [];
-      const practiceProblems = modeData.practiceRawProblems || [];
-      srcContestCount.textContent  = String(applyFilters(contestProblems).length);
-      srcPracticeCount.textContent = String(applyFilters(practiceProblems).length);
+      srcContestCount.textContent  = String(applyFilters(modeData.categoryRawProblems?.[cat] || []).length);
+      srcPracticeCount.textContent = String(applyFilters(modeData.practiceRawProblems || []).length);
     }
 
     srcContestBtn.appendChild(document.createTextNode("In-contest"));
@@ -1011,7 +1259,7 @@
       updateSourceBtns(); refreshAvailableTags(); renderList();
     });
 
-    // ── RIGHT CONTROLS ──
+    // ── RIGHT ICON BUTTONS ──
     const rightBtns = document.createElement("div");
     rightBtns.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0;";
 
@@ -1027,16 +1275,19 @@
 
     const filterDd = document.createElement("div");
     filterDd.id = "cfpm-filter-dd";
-    filterDd.style.cssText = `background:${theme.dropdownBg};border:1px solid ${theme.dropdownBorder};display:none;`;
+    filterDd.style.cssText = `background:${theme.dropdownBg};border:1px solid ${theme.dropdownBorder};overflow:hidden;display:none;`;
 
-    // ── SECTION 1: Min. wrong attempts ──
+    // Min. wrong attempts section
     const minAttSection = document.createElement("div");
-    minAttSection.style.cssText = `display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid ${theme.dropdownBorder};gap:10px;`;
+    minAttSection.style.cssText = `display:flex;flex-direction:column;padding:9px 12px;border-bottom:1px solid ${theme.dropdownBorder};gap:6px;`;
+
+    const minAttTopRow = document.createElement("div");
+    minAttTopRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;";
 
     const minAttLabel = document.createElement("span");
     minAttLabel.style.cssText = `font-size:12px;color:${theme.text};white-space:nowrap;`;
     minAttLabel.textContent = "Min. wrong attempts";
-    minAttSection.appendChild(minAttLabel);
+    minAttTopRow.appendChild(minAttLabel);
 
     const minAttControls = document.createElement("div");
     minAttControls.style.cssText = "display:flex;align-items:center;gap:5px;flex-shrink:0;";
@@ -1058,9 +1309,10 @@
     minAttControls.appendChild(minAttDec);
     minAttControls.appendChild(minAttVal);
     minAttControls.appendChild(minAttInc);
-    minAttSection.appendChild(minAttControls);
+    minAttTopRow.appendChild(minAttControls);
+    minAttSection.appendChild(minAttTopRow);
 
-    // ── SECTION 2: Difficulty range ──
+    // Difficulty range section
     const ratingSection = document.createElement("div");
     ratingSection.style.cssText = `padding:9px 12px;border-bottom:1px solid ${theme.dropdownBorder};`;
 
@@ -1092,7 +1344,6 @@
     ratingMaxInput.style.cssText = `width:58px;height:26px;padding:0 6px;border-radius:4px;border:1px solid ${theme.inputBorder};background:${theme.inputBg};color:${theme.inputText};font-size:12px;font-weight:600;text-align:center;font-family:Arial,sans-serif;outline:none;box-sizing:border-box;`;
 
     const ratingClearBtn = document.createElement("button");
-    ratingClearBtn.className = "cfpm-filter-clear-btn";
     ratingClearBtn.textContent = "Clear";
     ratingClearBtn.style.cssText = `font-size:11px;font-weight:600;cursor:pointer;background:none;border:none;padding:0;outline:none;color:${theme.btnActiveBg};margin-left:auto;display:${(localRatingMin !== "" || localRatingMax !== "") ? "inline" : "none"};`;
 
@@ -1117,10 +1368,10 @@
 
     ratingMinInput.addEventListener("change", handleRatingChange);
     ratingMaxInput.addEventListener("change", handleRatingChange);
-    ratingMinInput.addEventListener("keyup", handleRatingChange);
-    ratingMaxInput.addEventListener("keyup", handleRatingChange);
-    ratingMinInput.addEventListener("click", e => e.stopPropagation());
-    ratingMaxInput.addEventListener("click", e => e.stopPropagation());
+    ratingMinInput.addEventListener("keyup",  handleRatingChange);
+    ratingMaxInput.addEventListener("keyup",  handleRatingChange);
+    ratingMinInput.addEventListener("click",  e => e.stopPropagation());
+    ratingMaxInput.addEventListener("click",  e => e.stopPropagation());
 
     ratingClearBtn.addEventListener("click", e => {
       e.stopPropagation();
@@ -1131,19 +1382,18 @@
       updateFilterBtnStyle(); updateSourceCounts(); renderList(); autoSave();
     });
 
-    // ── SECTION 3: Topics ──
+    // Topics section
     const topicsSection = document.createElement("div");
-    topicsSection.style.cssText = `padding:9px 12px 0 12px;`;
+    topicsSection.style.cssText = `padding:9px 12px 10px 12px;`;
 
     const topicsRow = document.createElement("div");
-    topicsRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:0;";
+    topicsRow.style.cssText = "display:flex;align-items:center;gap:8px;";
 
     const topicsLabelEl = document.createElement("span");
-    topicsLabelEl.style.cssText = `font-size:12px;color:${theme.text};flex:1;`;
+    topicsLabelEl.style.cssText = `font-size:12px;color:${theme.text};flex:1;font-weight:500;`;
     topicsLabelEl.textContent = "Topics";
 
     const topicClearBtn = document.createElement("button");
-    topicClearBtn.className = "cfpm-filter-clear-btn";
     topicClearBtn.textContent = "Clear";
     topicClearBtn.style.cssText = `font-size:11px;font-weight:600;cursor:pointer;background:none;border:none;padding:0;outline:none;color:${theme.btnActiveBg};display:${localTagFilters.size > 0 ? "inline" : "none"};`;
 
@@ -1153,8 +1403,8 @@
 
     function updateAddTopicBtnLabel() {
       addTopicBtn.innerHTML = topicPickerOpen
-        ? `<svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l6 6M7 1L1 7"/></svg> Close`
-        : `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4.5" y1="1" x2="4.5" y2="8"/><line x1="1" y1="4.5" x2="8" y2="4.5"/></svg> Add tag`;
+        ? `<svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l6 6M7 1L1 7"/></svg>&nbsp;Close`
+        : `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4.5" y1="1" x2="4.5" y2="8"/><line x1="1" y1="4.5" x2="8" y2="4.5"/></svg>&nbsp;Add tag`;
     }
     updateAddTopicBtnLabel();
 
@@ -1163,16 +1413,16 @@
     topicsRow.appendChild(addTopicBtn);
     topicsSection.appendChild(topicsRow);
 
-    // Selected tag pills
     const filterTagPillsRow = document.createElement("div");
     filterTagPillsRow.className = "cfpm-filter-tag-pills";
-    filterTagPillsRow.style.display = localTagFilters.size > 0 ? "flex" : "none";
+    filterTagPillsRow.style.display  = localTagFilters.size > 0 ? "flex" : "none";
     filterTagPillsRow.style.marginTop = localTagFilters.size > 0 ? "7px" : "0";
+    filterTagPillsRow.style.padding  = "0";
 
     function renderFilterTagPills() {
       filterTagPillsRow.innerHTML = "";
       const hasFilters = localTagFilters.size > 0;
-      filterTagPillsRow.style.display = hasFilters ? "flex" : "none";
+      filterTagPillsRow.style.display  = hasFilters ? "flex" : "none";
       filterTagPillsRow.style.marginTop = hasFilters ? "7px" : "0";
       topicClearBtn.style.display = hasFilters ? "inline" : "none";
       localTagFilters.forEach(tag => {
@@ -1201,43 +1451,107 @@
     renderFilterTagPills();
     topicsSection.appendChild(filterTagPillsRow);
 
-    // Collapsible topic picker panel
+    // ── TOPIC PICKER PANEL ──
     const topicPickerPanel = document.createElement("div");
-    topicPickerPanel.className = "cfpm-topic-picker";
-    topicPickerPanel.style.cssText = `border-top:1px solid ${theme.dropdownBorder};overflow:hidden;max-height:0;opacity:0;transition:max-height 0.22s cubic-bezier(0.4,0,0.2,1),opacity 0.18s ease;margin-top:8px;margin-left:-12px;margin-right:-12px;`;
+    topicPickerPanel.style.cssText = [
+      "position:absolute",
+      "top:calc(100% + 6px)", "right:0",
+      "z-index:10001",
+      `background:${theme.dropdownBg}`,
+      `border:1px solid ${theme.dropdownBorder}`,
+      "border-radius:6px",
+      "min-width:260px", "max-width:300px",
+      "overflow:hidden",
+      "box-shadow:0 8px 32px rgba(0,0,0,0.16),0 2px 6px rgba(0,0,0,0.08)",
+      "display:none",
+      "flex-direction:column"
+    ].join(";");
+
+    const pickerHeader = document.createElement("div");
+    pickerHeader.style.cssText = [
+      "padding:8px 12px 7px 12px",
+      "font-size:12px",
+      "font-weight:600",
+      `color:${theme.mutedStrong}`,
+      `border-bottom:1px solid ${theme.dropdownBorder}`,
+      `background:${theme.dropdownSection}`,
+      "flex-shrink:0"
+    ].join(";");
+    pickerHeader.textContent = "Filter by topic";
 
     const tagSearchWrap = document.createElement("div");
     tagSearchWrap.className = "cfpm-tag-search-wrap";
-    tagSearchWrap.style.cssText = `position:relative;display:flex;align-items:center;border-bottom:1px solid ${theme.dropdownBorder};`;
-    tagSearchWrap.innerHTML = `<svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="${theme.muted}" stroke-width="1.6" stroke-linecap="round" style="position:absolute;left:9px;pointer-events:none;flex-shrink:0;"><circle cx="6" cy="6" r="4"/><path d="M10 10l2.5 2.5"/></svg>`;
+    tagSearchWrap.style.cssText = `position:relative;display:flex;align-items:center;border-bottom:1px solid ${theme.dropdownBorder};background:${theme.dropdownSection};flex-shrink:0;`;
+    tagSearchWrap.innerHTML = `<svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="${theme.muted}" stroke-width="1.6" stroke-linecap="round" style="position:absolute;left:9px;pointer-events:none;"><circle cx="6" cy="6" r="4"/><path d="M10 10l2.5 2.5"/></svg>`;
 
     const tagSearchInput = document.createElement("input");
     tagSearchInput.type = "text";
     tagSearchInput.placeholder = "Search topics…";
     tagSearchInput.className = "cfpm-tag-search";
-    tagSearchInput.style.cssText = `width:100%;box-sizing:border-box;height:28px;padding:0 10px 0 28px;font-size:12px;font-family:Arial,sans-serif;outline:none;border:none;background:${theme.dropdownSection};color:${theme.inputText};`;
+    tagSearchInput.style.cssText = `width:100%;box-sizing:border-box;height:30px;padding:0 10px 0 30px;font-size:12px;font-family:Arial,sans-serif;outline:none;border:none;background:transparent;color:${theme.inputText};`;
     tagSearchWrap.appendChild(tagSearchInput);
 
     const tagListEl = document.createElement("div");
     tagListEl.id = "cfpm-tag-list";
+    tagListEl.style.cssText = "overflow-y:auto;max-height:110px;flex:1;";
 
+    const pickerFooter = document.createElement("div");
+    pickerFooter.style.cssText = [
+      `border-top:1px solid ${theme.dropdownBorder}`,
+      `background:${theme.dropdownSection}`,
+      "padding:8px 12px",
+      "display:flex", "align-items:center", "justify-content:space-between",
+      "gap:8px", "flex-shrink:0"
+    ].join(";");
+
+    const pickerSelCount = document.createElement("span");
+    pickerSelCount.style.cssText = `font-size:11px;color:${theme.muted};`;
+
+    function updatePickerSelCount() {
+      const n = localTagFilters.size;
+      pickerSelCount.textContent = n > 0 ? `${n} selected` : "";
+    }
+    updatePickerSelCount();
+
+    const pickerDoneBtn = document.createElement("button");
+    pickerDoneBtn.className = "cfpm-pill-btn";
+    pickerDoneBtn.textContent = "Done";
+    pickerDoneBtn.style.cssText = [
+      `background:${theme.btnActiveBg}`,
+      `color:${theme.btnActiveText}`,
+      `border:1px solid ${theme.btnActiveBorder}`,
+      "cursor:pointer", "font-size:11px", "height:26px",
+      "padding:0 14px", "border-radius:4px", "font-weight:700"
+    ].join(";");
+
+    pickerDoneBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      topicPickerOpen = false;
+      updateAddTopicBtnLabel();
+      topicPickerPanel.style.display = "none";
+      openFilterDd();
+    });
+
+    pickerFooter.appendChild(pickerSelCount);
+    pickerFooter.appendChild(pickerDoneBtn);
+    topicPickerPanel.appendChild(pickerHeader);
     topicPickerPanel.appendChild(tagSearchWrap);
     topicPickerPanel.appendChild(tagListEl);
-    topicsSection.appendChild(topicPickerPanel);
+    topicPickerPanel.appendChild(pickerFooter);
 
     addTopicBtn.addEventListener("click", e => {
       e.stopPropagation();
       topicPickerOpen = !topicPickerOpen;
       updateAddTopicBtnLabel();
       if (topicPickerOpen) {
-        topicPickerPanel.style.maxHeight = "200px";
-        topicPickerPanel.style.opacity = "1";
+        if (filterOpen) { filterDd.style.display = "none"; filterOpen = false; }
+        topicPickerPanel.style.display = "flex";
         tagSearchInput.value = "";
         renderTagListOnly();
+        updatePickerSelCount();
         setTimeout(() => tagSearchInput.focus(), 50);
       } else {
-        topicPickerPanel.style.maxHeight = "0";
-        topicPickerPanel.style.opacity = "0";
+        topicPickerPanel.style.display = "none";
       }
     });
 
@@ -1245,9 +1559,10 @@
     tagSearchInput.addEventListener("click", e => e.stopPropagation());
     tagSearchInput.addEventListener("keydown", e => {
       if (e.key === "Escape") {
-        topicPickerOpen = false; updateAddTopicBtnLabel();
-        topicPickerPanel.style.maxHeight = "0";
-        topicPickerPanel.style.opacity = "0";
+        topicPickerOpen = false;
+        updateAddTopicBtnLabel();
+        topicPickerPanel.style.display = "none";
+        openFilterDd();
       }
     });
 
@@ -1255,15 +1570,15 @@
       e.stopPropagation();
       localTagFilters.clear(); activeTagFilters.clear();
       updateFilterBtnStyle(); renderFilterTagPills(); renderTagPills(); renderTagListOnly(); updateSourceCounts(); renderList(); autoSave();
+      updatePickerSelCount();
     });
 
-    // Assemble filter dropdown
     filterDd.appendChild(minAttSection);
     filterDd.appendChild(ratingSection);
     filterDd.appendChild(topicsSection);
-
     filterBtnWrap.appendChild(filterIconBtn);
     filterBtnWrap.appendChild(filterDd);
+    filterBtnWrap.appendChild(topicPickerPanel);
 
     // ── SORT BUTTON + DROPDOWN ──
     const sortBtnWrap = document.createElement("div");
@@ -1285,7 +1600,7 @@
     sortDd.appendChild(sortDdLabel);
 
     const sortOptions = [
-      { key: "errors", label: "Wrong attempts", desc: "Most errors first" },
+      { key: "errors", label: "Wrong attempts", desc: "Most errors first"   },
       { key: "rating", label: "Rating",          desc: "Highest rated first" },
     ];
 
@@ -1295,16 +1610,24 @@
         const opt = document.createElement("div");
         opt.className = "cfpm-sort-opt";
         const isActive = sortMode === key;
-        opt.style.cssText = [`background:${isActive ? (detectDarkMode() ? "#16244a" : "#f0f5ff") : "transparent"}`, `color:${theme.text}`].join(";");
+        opt.style.cssText = [
+          `background:${isActive ? (detectDarkMode() ? "#16244a" : "#f0f5ff") : "transparent"}`,
+          `color:${theme.text}`
+        ].join(";");
 
         const leftCol = document.createElement("div");
         leftCol.style.cssText = "display:flex;flex-direction:column;gap:2px;flex:1;";
+
         const lblEl = document.createElement("div");
         lblEl.style.cssText = `font-size:12px;font-weight:${isActive ? "700" : "600"};color:${isActive ? theme.btnActiveBg : theme.text};`;
         lblEl.textContent = label;
+
         const descEl = document.createElement("div");
-        descEl.textContent = desc; descEl.style.cssText = `font-size:11px;color:${theme.muted};`;
-        leftCol.appendChild(lblEl); leftCol.appendChild(descEl);
+        descEl.textContent = desc;
+        descEl.style.cssText = `font-size:11px;color:${theme.muted};`;
+
+        leftCol.appendChild(lblEl);
+        leftCol.appendChild(descEl);
         opt.appendChild(leftCol);
 
         if (isActive) {
@@ -1351,25 +1674,36 @@
 
     function buildViewOptions() {
       while (viewDd.children.length > 1) viewDd.removeChild(viewDd.lastChild);
-
       const opts = [
         {
-          label: "Unsolved only",
-          desc:  "Hide already-solved problems",
+          label:    "Unsolved only",
+          desc:     "Hide already-solved problems",
           isActive: localHideAC,
-          toggle: () => { localHideAC = !localHideAC; hideAC = localHideAC; }
+          toggle:   () => {
+            localHideAC = !localHideAC; hideAC = localHideAC;
+            if (localHideAC) { localSolvedOnly = false; solvedOnlyGlobal = false; }
+          }
         },
         {
-          label: "Hide topic tags",
-          desc:  "Don't show topic tags",
+          label:    "Solved only",
+          desc:     "Show only solved problems",
+          isActive: localSolvedOnly,
+          toggle:   () => {
+            localSolvedOnly = !localSolvedOnly; solvedOnlyGlobal = localSolvedOnly;
+            if (localSolvedOnly) { localHideAC = false; hideAC = false; }
+          }
+        },
+        {
+          label:    "Hide topic tags",
+          desc:     "Don't show topic tags",
           isActive: localHideTags,
-          toggle: () => { localHideTags = !localHideTags; hideTagsGlobal = localHideTags; }
+          toggle:   () => { localHideTags = !localHideTags; hideTagsGlobal = localHideTags; }
         },
         {
-          label: "Hide ratings",
-          desc:  "Don't show difficulty ratings",
+          label:    "Hide ratings",
+          desc:     "Don't show difficulty ratings",
           isActive: localHideRatings,
-          toggle: () => { localHideRatings = !localHideRatings; hideRatingsGlobal = localHideRatings; }
+          toggle:   () => { localHideRatings = !localHideRatings; hideRatingsGlobal = localHideRatings; }
         },
       ];
 
@@ -1410,24 +1744,20 @@
         opt.addEventListener("click", e => {
           e.stopPropagation();
           toggle();
-          buildViewOptions();
-          updateViewBtnStyle();
-          updateSourceCounts();
-          renderList();
-          autoSave();
+          buildViewOptions(); updateViewBtnStyle(); updateSourceCounts(); renderList(); autoSave();
         });
-
         viewDd.appendChild(opt);
       });
     }
 
     function updateViewBtnStyle() {
-      const hasActive = localHideAC || localHideTags || localHideRatings;
+      const hasActive = localHideAC || localSolvedOnly || localHideTags || localHideRatings;
       viewIconBtn.style.background  = hasActive ? theme.btnActiveBg : theme.btnBg;
       viewIconBtn.style.color       = hasActive ? theme.btnActiveText : theme.muted;
       viewIconBtn.style.borderColor = hasActive ? theme.btnActiveBorder : theme.btnBorder;
       const parts = [];
       if (localHideAC)      parts.push("Unsolved only");
+      if (localSolvedOnly)  parts.push("Solved only");
       if (localHideTags)    parts.push("Tags hidden");
       if (localHideRatings) parts.push("Ratings hidden");
       viewIconBtn.title = parts.length ? parts.join(" · ") : "View options";
@@ -1440,7 +1770,7 @@
     topBar.appendChild(segWrap);
     topBar.appendChild(rightBtns);
 
-    // ── ACTIVE TAG PILLS ROW (below top bar, outside dropdown) ──
+    // ── ACTIVE TAG PILLS ROW ──
     const tagPillRow = document.createElement("div");
     tagPillRow.style.cssText = [
       "display:none", "align-items:center", "padding:5px 12px",
@@ -1455,14 +1785,19 @@
       localTagFilters.forEach(tag => {
         const pill = document.createElement("span");
         pill.className = "cfpm-tag-pill";
-        pill.style.cssText = [`background:${detectDarkMode() ? "#16244a" : "#dbeafe"}`, `color:${detectDarkMode() ? "#93c5fd" : "#1e40af"}`, `border:1px solid ${detectDarkMode() ? "#2d5ba6" : "#93c5fd"}`].join(";");
-        const tagText = document.createElement("span"); tagText.textContent = tag;
-        const closeX = document.createElement("span"); closeX.textContent = "✕"; closeX.style.cssText = "opacity:0.5;font-size:9px;margin-left:1px;";
+        pill.style.cssText = [
+          `background:${detectDarkMode() ? "#16244a" : "#dbeafe"}`,
+          `color:${detectDarkMode() ? "#93c5fd" : "#1e40af"}`,
+          `border:1px solid ${detectDarkMode() ? "#2d5ba6" : "#93c5fd"}`
+        ].join(";");
+        const tagText  = document.createElement("span"); tagText.textContent = tag;
+        const closeX   = document.createElement("span"); closeX.textContent = "✕"; closeX.style.cssText = "opacity:0.5;font-size:9px;margin-left:1px;";
         pill.appendChild(tagText); pill.appendChild(closeX);
         pill.title = `Remove: ${tag}`;
         pill.addEventListener("click", () => {
           localTagFilters.delete(tag); activeTagFilters = new Set(localTagFilters);
           updateFilterBtnStyle(); renderTagPills(); renderFilterTagPills(); renderTagListOnly(); updateSourceCounts(); renderList(); autoSave();
+          updatePickerSelCount();
         });
         tagPillRow.appendChild(pill);
       });
@@ -1474,18 +1809,16 @@
 
     function getFilterTitle() {
       const parts = [];
-      if (localMinAttempts > 1) parts.push(`Min ${localMinAttempts} errors`);
+      if (localMinAttempts !== 1) parts.push(`Min ${localMinAttempts} errors`);
       if (localRatingMin !== "" || localRatingMax !== "") {
-        const rlo = localRatingMin || "any";
-        const rhi = localRatingMax || "any";
-        parts.push(`Rating ${rlo}–${rhi}`);
+        parts.push(`Rating ${localRatingMin || "any"}–${localRatingMax || "any"}`);
       }
       if (localTagFilters.size > 0) parts.push(`${localTagFilters.size} topic${localTagFilters.size > 1 ? "s" : ""}`);
       return parts.length ? `Filters: ${parts.join(", ")}` : "Filter";
     }
 
     function updateFilterBtnStyle() {
-      const hasFilter = localTagFilters.size > 0 || localMinAttempts > 1 || localRatingMin !== "" || localRatingMax !== "";
+      const hasFilter = localTagFilters.size > 0 || localMinAttempts !== 1 || localRatingMin !== "" || localRatingMax !== "";
       filterIconBtn.style.background  = hasFilter ? theme.btnActiveBg : theme.btnBg;
       filterIconBtn.style.color       = hasFilter ? theme.btnActiveText : theme.muted;
       filterIconBtn.style.borderColor = hasFilter ? theme.btnActiveBorder : theme.btnBorder;
@@ -1503,10 +1836,14 @@
     }
     updateSortBtnStyle();
 
+    // ── THE KEY FIX: always seed with ALL_CF_TAGS so every tag is always shown ──
     function renderTagListOnly() {
       tagListEl.innerHTML = "";
       const searchVal = tagSearchInput.value.toLowerCase().trim();
-      const combinedTags = new Set([...availableTags, ...localTagFilters]);
+
+      // Merge: always start with the full CF tag list, add any tags from current
+      // problems and any currently-selected filters (catches custom/unlisted tags too)
+      const combinedTags  = new Set([...ALL_CF_TAGS, ...availableTags, ...localTagFilters]);
       const allTagsSorted = Array.from(combinedTags).sort()
         .filter(tag => !searchVal || tag.toLowerCase().includes(searchVal));
 
@@ -1514,10 +1851,12 @@
         const empty = document.createElement("div");
         empty.style.cssText = `padding:12px;color:${theme.emptyText};font-size:12px;font-style:italic;text-align:center;`;
         empty.textContent = searchVal ? "No matching topics." : "No topics available.";
-        tagListEl.appendChild(empty); return;
+        tagListEl.appendChild(empty);
+        return;
       }
       allTagsSorted.forEach(tag => {
-        const isActive = localTagFilters.has(tag);
+        const isActive    = localTagFilters.has(tag);
+        // A tag is "available" only if it actually appears in the current problem set
         const isAvailable = availableTags.includes(tag);
         const row = document.createElement("div");
         row.className = "cfpm-tag-opt";
@@ -1529,7 +1868,10 @@
 
         const check = document.createElement("span");
         check.className = "cfpm-tag-check";
-        check.style.cssText = [`border:1.5px solid ${isActive ? theme.btnActiveBg : theme.btnBorder}`, `background:${isActive ? theme.btnActiveBg : "transparent"}`].join(";");
+        check.style.cssText = [
+          `border:1.5px solid ${isActive ? theme.btnActiveBg : theme.btnBorder}`,
+          `background:${isActive ? theme.btnActiveBg : "transparent"}`
+        ].join(";");
         if (isActive) check.textContent = "✓";
 
         const lbl = document.createElement("span");
@@ -1542,14 +1884,14 @@
           if (localTagFilters.has(tag)) localTagFilters.delete(tag); else localTagFilters.add(tag);
           activeTagFilters = new Set(localTagFilters);
           updateFilterBtnStyle(); renderTagListOnly(); renderTagPills(); renderFilterTagPills(); updateSourceCounts(); renderList(); autoSave();
+          updatePickerSelCount();
         });
         tagListEl.appendChild(row);
       });
     }
 
     function refreshAvailableTags() {
-      const allProblems = getProblems();
-      availableTags = getAllTags(allProblems);
+      availableTags = getAllTags(getProblems());
       renderTagListOnly();
       renderTagPills();
       renderFilterTagPills();
@@ -1563,22 +1905,31 @@
       if (!problems.length) {
         const empty = document.createElement("div");
         empty.style.cssText = `padding:24px 14px;color:${theme.emptyText};font-style:italic;font-size:13px;text-align:center;`;
-        const hasActiveFilters = localTagFilters.size > 0 || localRatingMin !== "" || localRatingMax !== "";
-        empty.textContent = hasActiveFilters ? "No problems match the selected filters." : "No problems with errors found.";
-        listArea.appendChild(empty); return;
+        const hasActiveFilters = localTagFilters.size > 0 || localRatingMin !== "" || localRatingMax !== "" || localSolvedOnly || localHideAC;
+        empty.textContent = hasActiveFilters
+          ? "No problems match the selected filters."
+          : "No problems with errors found.";
+        listArea.appendChild(empty);
+        return;
       }
 
       const sorted = problems.slice().sort((a, b) =>
         sortMode === "rating" ? (b.rating || 0) - (a.rating || 0) : totalErrors(b) - totalErrors(a)
       );
 
-      const isDark = detectDarkMode();
-      const maxErr = totalErrors(sorted[0]) || 1;
+      const isDark  = detectDarkMode();
+      const maxErr  = Math.max(...sorted.map(p => totalErrors(p)), 1);
 
       sorted.forEach((p, i) => {
-        const row = document.createElement("div");
-        const intensity = totalErrors(p) / maxErr;
-        const borderClr = intensity > 0.66 ? "#e74c3c" : intensity > 0.33 ? "#e67e22" : "#27ae60";
+        const row      = document.createElement("div");
+        const errCount = totalErrors(p);
+        let borderClr;
+        if (errCount === 0) {
+          borderClr = "#27ae60";
+        } else {
+          const intensity = errCount / maxErr;
+          borderClr = intensity > 0.66 ? "#e74c3c" : intensity > 0.33 ? "#e67e22" : "#27ae60";
+        }
         row.style.cssText = [
           "display:flex", "align-items:center", "gap:6px", "padding:6px 12px",
           i > 0 ? `border-top:1px solid ${theme.borderLighter}` : "",
@@ -1586,14 +1937,16 @@
         ].join(";");
 
         const link = document.createElement("a");
-        link.href = `https://codeforces.com/contest/${p.contestId}/problem/${p.index}`;
-        link.target = "_blank"; link.rel = "noopener";
+        link.href   = `https://codeforces.com/contest/${p.contestId}/problem/${p.index}`;
+        link.target = "_blank";
+        link.rel    = "noopener";
         link.style.cssText = [
           `color:${theme.problemLink}`, "text-decoration:none", "font-size:12px", "font-weight:600",
           "flex:0 0 auto", "min-width:100px", "max-width:175px",
           "overflow:hidden", "text-overflow:ellipsis", "white-space:nowrap"
         ].join(";");
-        link.textContent = `${p.index}. ${p.name}`; link.title = p.name;
+        link.textContent = `${p.index}. ${p.name}`;
+        link.title = p.name;
         link.addEventListener("click", e => e.stopPropagation());
         row.appendChild(link);
 
@@ -1612,24 +1965,31 @@
           row.appendChild(rb);
         }
 
-        [
-          { key:"wa",    label:"WA",  bg:theme.waBadge,  fg:theme.waBadgeText },
-          { key:"tle",   label:"TLE", bg:theme.tleBg,    fg:theme.tleFg       },
-          { key:"rte",   label:"RTE", bg:theme.rteBg,    fg:theme.rteFg       },
-          { key:"mle",   label:"MLE", bg:theme.mleBg,    fg:theme.mleFg       },
-          { key:"other", label:"Err", bg:theme.errBg,    fg:theme.errFg       },
-        ].forEach(({ key, label, bg, fg }) => {
-          const cnt = p[key] || 0; if (!cnt) return;
-          const badge = document.createElement("span");
-          badge.style.cssText = [`background:${bg}`, `color:${fg}`, "font-size:10px", "font-weight:700", "border-radius:3px", "padding:1px 6px", "white-space:nowrap", "flex-shrink:0"].join(";");
-          badge.textContent = `${label} ×${cnt}`;
-          row.appendChild(badge);
-        });
+        if (errCount > 0) {
+          [
+            { key: "wa",    label: "WA",  bg: theme.waBadge, fg: theme.waBadgeText },
+            { key: "tle",   label: "TLE", bg: theme.tleBg,   fg: theme.tleFg       },
+            { key: "rte",   label: "RTE", bg: theme.rteBg,   fg: theme.rteFg       },
+            { key: "mle",   label: "MLE", bg: theme.mleBg,   fg: theme.mleFg       },
+            { key: "other", label: "Err", bg: theme.errBg,   fg: theme.errFg       },
+          ].forEach(({ key, label, bg, fg }) => {
+            const cnt = p[key] || 0;
+            if (!cnt) return;
+            const badge = document.createElement("span");
+            badge.style.cssText = [
+              `background:${bg}`, `color:${fg}`,
+              "font-size:10px", "font-weight:700", "border-radius:3px",
+              "padding:1px 6px", "white-space:nowrap", "flex-shrink:0"
+            ].join(";");
+            badge.textContent = `${label} ×${cnt}`;
+            row.appendChild(badge);
+          });
+        }
 
         const sb = document.createElement("span");
         if (p.solved) {
           sb.style.cssText = `background:${theme.solvedBadge};color:${theme.solvedBadgeText};font-size:10px;font-weight:700;border-radius:3px;padding:1px 6px;white-space:nowrap;flex-shrink:0;`;
-          sb.textContent = "✓ AC";
+          sb.textContent = errCount === 0 ? "✓ AC (1st try)" : "✓ AC";
         } else {
           sb.style.cssText = `background:${theme.waBadge};color:${theme.waBadgeText};font-size:10px;border-radius:3px;padding:1px 6px;white-space:nowrap;flex-shrink:0;opacity:0.7;`;
           sb.textContent = "Unsolved";
@@ -1641,50 +2001,72 @@
     }
 
     function openFilterDd() {
-      refreshAvailableTags(); filterDd.style.display = "flex"; filterOpen = true;
-      filterIconBtn.style.background = theme.btnActiveBg;
-      filterIconBtn.style.color = theme.btnActiveText;
+      refreshAvailableTags();
+      filterDd.style.display = "flex";
+      filterOpen = true;
+      filterIconBtn.style.background  = theme.btnActiveBg;
+      filterIconBtn.style.color       = theme.btnActiveText;
       filterIconBtn.style.borderColor = theme.btnActiveBorder;
     }
     function closeFilterDd() {
-      filterDd.style.display = "none"; filterOpen = false; updateFilterBtnStyle();
+      filterDd.style.display = "none";
+      filterOpen = false;
+      updateFilterBtnStyle();
       if (topicPickerOpen) {
         topicPickerOpen = false;
         updateAddTopicBtnLabel();
-        topicPickerPanel.style.maxHeight = "0";
-        topicPickerPanel.style.opacity = "0";
+        topicPickerPanel.style.display = "none";
       }
     }
     function openSortDd() {
-      buildSortOptions(); sortDd.style.display = "block"; sortOpen = true;
-      sortIconBtn.style.background = theme.btnActiveBg;
-      sortIconBtn.style.color = theme.btnActiveText;
+      buildSortOptions();
+      sortDd.style.display = "block";
+      sortOpen = true;
+      sortIconBtn.style.background  = theme.btnActiveBg;
+      sortIconBtn.style.color       = theme.btnActiveText;
       sortIconBtn.style.borderColor = theme.btnActiveBorder;
     }
     function closeSortDd() {
-      sortDd.style.display = "none"; sortOpen = false; updateSortBtnStyle();
+      sortDd.style.display = "none";
+      sortOpen = false;
+      updateSortBtnStyle();
     }
     function openViewDd() {
-      buildViewOptions(); viewDd.style.display = "block"; viewOpen = true;
-      viewIconBtn.style.background = theme.btnActiveBg;
-      viewIconBtn.style.color = theme.btnActiveText;
+      buildViewOptions();
+      viewDd.style.display = "block";
+      viewOpen = true;
+      viewIconBtn.style.background  = theme.btnActiveBg;
+      viewIconBtn.style.color       = theme.btnActiveText;
       viewIconBtn.style.borderColor = theme.btnActiveBorder;
     }
     function closeViewDd() {
-      viewDd.style.display = "none"; viewOpen = false; updateViewBtnStyle();
+      viewDd.style.display = "none";
+      viewOpen = false;
+      updateViewBtnStyle();
     }
 
     filterIconBtn.addEventListener("click", e => {
       e.stopPropagation();
+      if (topicPickerOpen) { topicPickerOpen = false; updateAddTopicBtnLabel(); topicPickerPanel.style.display = "none"; }
       if (filterOpen) { closeFilterDd(); } else { if (sortOpen) closeSortDd(); if (viewOpen) closeViewDd(); openFilterDd(); }
     });
     sortIconBtn.addEventListener("click", e => {
       e.stopPropagation();
-      if (sortOpen) { closeSortDd(); } else { if (filterOpen) closeFilterDd(); if (viewOpen) closeViewDd(); openSortDd(); }
+      if (sortOpen) { closeSortDd(); } else {
+        if (filterOpen) closeFilterDd();
+        if (viewOpen) closeViewDd();
+        if (topicPickerOpen) { topicPickerOpen = false; updateAddTopicBtnLabel(); topicPickerPanel.style.display = "none"; }
+        openSortDd();
+      }
     });
     viewIconBtn.addEventListener("click", e => {
       e.stopPropagation();
-      if (viewOpen) { closeViewDd(); } else { if (filterOpen) closeFilterDd(); if (sortOpen) closeSortDd(); openViewDd(); }
+      if (viewOpen) { closeViewDd(); } else {
+        if (filterOpen) closeFilterDd();
+        if (sortOpen) closeSortDd();
+        if (topicPickerOpen) { topicPickerOpen = false; updateAddTopicBtnLabel(); topicPickerPanel.style.display = "none"; }
+        openViewDd();
+      }
     });
 
     minAttDec.addEventListener("click", e => {
@@ -1711,13 +2093,12 @@
       if (filterOpen && !filterBtnWrap.contains(e.target)) closeFilterDd();
       if (sortOpen   && !sortBtnWrap.contains(e.target))   closeSortDd();
       if (viewOpen   && !viewBtnWrap.contains(e.target))   closeViewDd();
+      if (topicPickerOpen && !filterBtnWrap.contains(e.target)) {
+        topicPickerOpen = false; updateAddTopicBtnLabel(); topicPickerPanel.style.display = "none";
+      }
     };
     document.addEventListener("click", window._cfpmPanelClickHandler);
 
-    frictionScrollBox.style.cssText = [
-      "overflow:hidden", `border:1px solid ${theme.borderLight}`,
-      "border-radius:5px", "display:flex", "flex-direction:column", "padding:0", "height:305px"
-    ].join(";");
     frictionScrollBox.appendChild(topBar);
     frictionScrollBox.appendChild(tagPillRow);
     frictionScrollBox.appendChild(listArea);
@@ -1725,12 +2106,14 @@
     refreshAvailableTags(); renderTagPills(); renderList();
   }
 
-  // ── TABLE RENDERER ──
+  // ── STATS TABLE ──
   function renderTableForCategory(modeData, cat, deltaInfo) {
     const idxTimes    = modeData.categoryIndexTimes[cat]    || {};
     const idxAttempts = modeData.categoryIndexAttempts[cat] || {};
     const idxSolved   = modeData.categoryIndexSolved[cat]   || {};
-    const allIdx = Array.from(new Set([...DEFAULT_INDICES, ...Object.keys(idxTimes), ...Object.keys(idxAttempts)])).sort((a, b) => a.localeCompare(b));
+    const allIdx = Array.from(
+      new Set([...DEFAULT_INDICES, ...Object.keys(idxTimes), ...Object.keys(idxAttempts)])
+    ).sort((a, b) => a.localeCompare(b));
 
     table.innerHTML = "";
     const headRow = document.createElement("tr");
@@ -1746,18 +2129,17 @@
     cornerCatName.textContent = cat;
     cornerRow.appendChild(cornerCatName);
 
-    // ── DELTA BADGE: always shown (Δ 0 when no rated contests in period) ──
     if (deltaInfo) {
-      const isDark = detectDarkMode();
-      const deltaEl = document.createElement("span");
-      const sign = deltaInfo.delta > 0 ? "+" : "";
+      const isDark     = detectDarkMode();
+      const sign       = deltaInfo.delta > 0 ? "+" : "";
       const deltaColor = deltaInfo.delta > 0 ? "#27ae60" : deltaInfo.delta < 0 ? "#e74c3c" : theme.muted;
-      const deltaBg = deltaInfo.delta > 0
+      const deltaBg    = deltaInfo.delta > 0
         ? (isDark ? "#0d2318" : "#e6f4ea")
         : deltaInfo.delta < 0
           ? (isDark ? "#2a1212" : "#fdecea")
           : (isDark ? "#222" : "#f5f5f5");
 
+      const deltaEl = document.createElement("span");
       deltaEl.style.cssText = `display:inline-flex;align-items:center;gap:3px;padding:1px 7px 1px 5px;border-radius:10px;background:${deltaBg};`;
 
       const deltaIcon = document.createElement("span");
@@ -1772,12 +2154,9 @@
       deltaEl.appendChild(deltaVal);
       cornerRow.appendChild(deltaEl);
 
-      // Tooltip: contextual based on count
-      if (deltaInfo.count > 0) {
-        corner.title = `Rating change in ${deltaInfo.count} rated ${cat} contest${deltaInfo.count !== 1 ? "s" : ""} (selected period)`;
-      } else {
-        corner.title = `No rated ${cat} contests in the selected period`;
-      }
+      corner.title = deltaInfo.count > 0
+        ? `Rating change in ${deltaInfo.count} rated ${cat} contest${deltaInfo.count !== 1 ? "s" : ""} (selected period)`
+        : `No rated ${cat} contests in the selected period`;
     }
 
     corner.appendChild(cornerRow);
@@ -1786,53 +2165,78 @@
     allIdx.forEach(idx => {
       const th = document.createElement("th");
       th.style.cssText = `text-align:center;padding:5px 14px;font-weight:700;font-size:13px;color:${theme.headingText};border-bottom:2px solid ${theme.borderLight};`;
-      th.textContent = idx; headRow.appendChild(th);
+      th.textContent = idx;
+      headRow.appendChild(th);
     });
     table.appendChild(headRow);
 
     if (!allIdx.length) {
-      const eRow = document.createElement("tr"), eTd = document.createElement("td");
-      eTd.colSpan = 2; eTd.style.cssText = `padding:12px 8px;color:${theme.emptyText};font-style:italic;font-size:12px;`;
-      eTd.textContent = "No contest data for " + cat + "."; eRow.appendChild(eTd); table.appendChild(eRow); return;
+      const eRow = document.createElement("tr");
+      const eTd  = document.createElement("td");
+      eTd.colSpan = 2;
+      eTd.style.cssText = `padding:12px 8px;color:${theme.emptyText};font-style:italic;font-size:12px;`;
+      eTd.textContent = "No contest data for " + cat + ".";
+      eRow.appendChild(eTd);
+      table.appendChild(eRow);
+      return;
     }
 
     function makeRow(label, getCellContent) {
       const row = document.createElement("tr");
       const lbl = document.createElement("td");
       lbl.style.cssText = `padding:6px 12px;color:${theme.tableHeaderText};font-size:11px;font-weight:600;white-space:nowrap;`;
-      lbl.textContent = label; row.appendChild(lbl);
+      lbl.textContent = label;
+      row.appendChild(lbl);
       allIdx.forEach(idx => row.appendChild(getCellContent(idx)));
       return row;
     }
 
     table.appendChild(makeRow("Avg. time (min)", idx => {
-      const arr = idxTimes[idx] || [], td = document.createElement("td");
+      const arr = idxTimes[idx] || [];
+      const td  = document.createElement("td");
       td.style.cssText = "text-align:center;padding:6px 14px;font-weight:700;color:#1652d6;font-size:13px;";
-      td.textContent = arr.length ? String(Math.round((arr.reduce((a,b)=>a+b,0)/arr.length)*10)/10) : "—"; return td;
+      td.textContent = arr.length
+        ? String(Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10)
+        : "—";
+      return td;
     }));
+
     table.appendChild(makeRow("Median time (min)", idx => {
-      const arr = idxTimes[idx] || [], td = document.createElement("td");
+      const arr = idxTimes[idx] || [];
+      const td  = document.createElement("td");
       td.style.cssText = `text-align:center;padding:6px 14px;font-weight:700;color:#6b4fa0;font-size:13px;border-top:1px solid ${theme.borderLighter};`;
-      const m = median(arr); td.textContent = m !== null ? String(Math.round(m*10)/10) : "—"; return td;
+      const m = median(arr);
+      td.textContent = m !== null ? String(Math.round(m * 10) / 10) : "—";
+      return td;
     }));
+
     table.appendChild(makeRow("Solved", idx => {
       const td = document.createElement("td");
       td.style.cssText = `text-align:center;padding:6px 14px;color:${theme.tableCellText};font-size:13px;border-top:1px solid ${theme.borderLighter};`;
-      td.textContent = String(idxSolved[idx] || 0); return td;
+      td.textContent = String(idxSolved[idx] || 0);
+      return td;
     }));
+
     table.appendChild(makeRow("Attempts", idx => {
       const td = document.createElement("td");
       td.style.cssText = `text-align:center;padding:6px 14px;color:${theme.tableCellText};font-size:13px;`;
-      td.textContent = String(idxAttempts[idx] || 0); return td;
+      td.textContent = String(idxAttempts[idx] || 0);
+      return td;
     }));
+
     table.appendChild(makeRow("Failure %", idx => {
-      const att = idxAttempts[idx] || 0, sol = idxSolved[idx] || 0, td = document.createElement("td");
+      const att = idxAttempts[idx] || 0;
+      const sol = idxSolved[idx]   || 0;
+      const td  = document.createElement("td");
       td.style.cssText = `text-align:center;padding:6px 14px;font-weight:700;font-size:13px;border-top:1px solid ${theme.borderLighter};`;
       if (att > 0) {
         const r = Math.round(((att - sol) / att) * 100);
         td.style.color = r < 40 ? "#27ae60" : r < 70 ? "#e67e22" : "#e74c3c";
         td.textContent = r + "%";
-      } else { td.style.color = theme.tableCellText; td.textContent = "—"; }
+      } else {
+        td.style.color = theme.tableCellText;
+        td.textContent = "—";
+      }
       return td;
     }));
   }
@@ -1843,24 +2247,26 @@
   function renderCategory(cat) {
     currentCategory = cat;
     Object.keys(categoryButtons).forEach(k => {
-      const b = categoryButtons[k], active = k === cat;
+      const b      = categoryButtons[k];
+      const active = k === cat;
       b.style.background  = active ? theme.btnActiveBg : theme.btnBg;
       b.style.color       = active ? theme.btnActiveText : theme.btnText;
       b.style.borderColor = active ? theme.btnActiveBorder : theme.btnBorder;
     });
 
-    const mode = modeSelect.value, timeline = savedTimeline;
+    const mode     = modeSelect.value;
+    const timeline = savedTimeline;
     info.textContent = "Calculating…";
 
     const timelineValue = timeline === "custom"
       ? { type: "custom", start: startDateInput.value, end: endDateInput.value }
       : timeline;
 
-    const modeData = recalcForMode(mode, timelineValue);
-    lastModeData = modeData;
+    const modeData  = recalcForMode(mode, timelineValue);
+    lastModeData    = modeData;
 
     const deltaInfo = calcDeltaRating(cat, timelineValue);
-    lastDeltaInfo = deltaInfo;
+    lastDeltaInfo   = deltaInfo;
 
     let timelineLabel;
     if (timeline === "custom" && startDateInput.value && endDateInput.value) {
@@ -1871,13 +2277,12 @@
     }
 
     const categoryCount = modeData.categoryContestCount[cat] || 0;
-
     let infoText = `${modeData.participatedCount} contests total · ${cat}: ${categoryCount}`;
     if (deltaInfo.count > 0) {
       const sign = deltaInfo.delta >= 0 ? "+" : "";
       infoText += ` · Δ ${sign}${deltaInfo.delta} (${deltaInfo.count} rated)`;
     }
-    infoText += ` · ${mode[0].toUpperCase()+mode.slice(1)} · ${timelineLabel}`;
+    infoText += ` · ${mode[0].toUpperCase() + mode.slice(1)} · ${timelineLabel}`;
     info.textContent = infoText;
 
     renderTableForCategory(modeData, cat, deltaInfo);
