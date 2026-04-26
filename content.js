@@ -44,7 +44,6 @@
   let userRatingHistory = [];
   const DEFAULT_INDICES = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
-  // ── ALL CODEFORCES TAGS (shown always, independent of current timeline/div) ──
   const ALL_CF_TAGS = [
     "*special", "2-sat", "binary search", "bitmasks", "brute force",
     "chinese remainder theorem", "combinatorics", "constructive algorithms",
@@ -178,7 +177,6 @@
 
   let theme = createTheme();
 
-  // ── GLOBAL STYLES ──
   if (!document.getElementById("cfpm-toggle-style")) {
     const s = document.createElement("style");
     s.id = "cfpm-toggle-style";
@@ -322,8 +320,182 @@
       .cfpm-filter-tag-pill-x {
         font-size: 9px; opacity: 0.6; margin-left: 1px;
       }
+
+      /* ── Submission popup ── */
+      #cfpm-sub-popup {
+        position: fixed;
+        z-index: 999999;
+        border-radius: 7px;
+        overflow: hidden;
+        box-shadow: 0 10px 36px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.12);
+        display: none;
+        flex-direction: column;
+        min-width: 220px;
+        max-width: 310px;
+      }
+      #cfpm-sub-popup-list {
+        overflow-y: auto;
+        max-height: 220px;
+        overscroll-behavior: contain;
+      }
+      #cfpm-sub-popup-list::-webkit-scrollbar { width: 4px; }
+      #cfpm-sub-popup-list::-webkit-scrollbar-track { background: transparent; }
+      #cfpm-sub-popup-list::-webkit-scrollbar-thumb { border-radius: 2px; background: rgba(128,128,128,0.25); }
+      .cfpm-sub-link {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 12px; text-decoration: none;
+        font-size: 12px; font-weight: 600; cursor: pointer;
+      }
+      .cfpm-sub-link:hover { filter: brightness(0.92); }
+      .cfpm-verdict-badge {
+        cursor: pointer;
+        transition: none !important;
+      }
+      .cfpm-verdict-badge:hover { opacity: 0.82; }
     `;
     document.head.appendChild(s);
+  }
+
+  // ── SUBMISSION POPUP SINGLETON ──
+  let _subPopupEl = null;
+  let _subPopupAnchor = null;
+
+  function getOrCreateSubPopup() {
+    if (_subPopupEl) return _subPopupEl;
+    _subPopupEl = document.createElement("div");
+    _subPopupEl.id = "cfpm-sub-popup";
+    document.body.appendChild(_subPopupEl);
+
+    document.addEventListener("click", e => {
+      if (_subPopupEl && _subPopupEl.style.display !== "none" && !_subPopupEl.contains(e.target)) {
+        _subPopupEl.style.display = "none";
+        _subPopupAnchor = null;
+      }
+    }, true);
+
+    window.addEventListener("scroll", e => {
+      if (!_subPopupEl || _subPopupEl.style.display === "none") return;
+      if (_subPopupEl.contains(e.target)) return;
+      _subPopupEl.style.display = "none";
+      _subPopupAnchor = null;
+    }, { passive: true, capture: true });
+
+    return _subPopupEl;
+  }
+
+  function showSubmissionPopup(anchorEl, label, ids, contestId, badgeBg, badgeFg) {
+    if (_subPopupAnchor === anchorEl && _subPopupEl && _subPopupEl.style.display !== "none") {
+      _subPopupEl.style.display = "none";
+      _subPopupAnchor = null;
+      return;
+    }
+    _subPopupAnchor = anchorEl;
+
+    const popup = getOrCreateSubPopup();
+    const isDark = detectDarkMode();
+    popup.style.background = theme.dropdownBg;
+    popup.style.border = `1px solid ${theme.dropdownBorder}`;
+    popup.innerHTML = "";
+
+    const header = document.createElement("div");
+    header.style.cssText = [
+      "padding:8px 12px 7px 12px",
+      "font-size:11px", "font-weight:700",
+      `color:${theme.mutedStrong}`,
+      `border-bottom:1px solid ${theme.dropdownBorder}`,
+      `background:${theme.dropdownSection}`,
+      "display:flex", "align-items:center", "gap:8px", "flex-shrink:0"
+    ].join(";");
+
+    const labelPill = document.createElement("span");
+    labelPill.textContent = label;
+    labelPill.style.cssText = [
+      `background:${badgeBg}`, `color:${badgeFg}`,
+      "font-size:10px", "font-weight:700", "border-radius:3px", "padding:1px 6px"
+    ].join(";");
+    header.appendChild(labelPill);
+
+    const headerText = document.createElement("span");
+    headerText.textContent = `${ids.length} submission${ids.length !== 1 ? "s" : ""}`;
+    header.appendChild(headerText);
+
+    const closeBtn = document.createElement("span");
+    closeBtn.textContent = "✕";
+    closeBtn.style.cssText = `margin-left:auto;cursor:pointer;opacity:0.45;font-size:11px;padding:2px 4px;border-radius:3px;`;
+    closeBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      popup.style.display = "none";
+      _subPopupAnchor = null;
+    });
+    closeBtn.addEventListener("mouseenter", () => { closeBtn.style.opacity = "0.8"; });
+    closeBtn.addEventListener("mouseleave", () => { closeBtn.style.opacity = "0.45"; });
+    header.appendChild(closeBtn);
+    popup.appendChild(header);
+
+    const list = document.createElement("div");
+    list.id = "cfpm-sub-popup-list";
+
+    list.addEventListener("click", e => e.stopPropagation());
+
+    ids.forEach((sid, i) => {
+      const item = document.createElement("a");
+      item.className = "cfpm-sub-link";
+      item.href = `https://codeforces.com/contest/${contestId}/submission/${sid}`;
+      item.target = "_blank";
+      item.rel = "noopener";
+      item.style.cssText = [
+        "display:flex", "align-items:center", "gap:8px",
+        "padding:8px 12px", "text-decoration:none",
+        `color:${theme.problemLink}`, "font-size:12px", "font-weight:600",
+        i > 0 ? `border-top:1px solid ${theme.borderLighter}` : "",
+        `background:${i % 2 === 0 ? "transparent" : (isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)")}`,
+      ].join(";");
+
+      const arrow = document.createElement("span");
+      arrow.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.55"><path d="M2 10L10 2M4 2h6v6"/></svg>`;
+      item.appendChild(arrow);
+
+      const numSpan = document.createElement("span");
+      numSpan.textContent = `Submission #${sid}`;
+      numSpan.style.cssText = "flex:1;";
+      item.appendChild(numSpan);
+
+      const idxBadge = document.createElement("span");
+      idxBadge.textContent = `#${i + 1}`;
+      idxBadge.style.cssText = `font-size:10px;color:${theme.muted};font-weight:400;flex-shrink:0;`;
+      item.appendChild(idxBadge);
+
+      list.appendChild(item);
+    });
+    popup.appendChild(list);
+
+    popup.style.display = "flex";
+    popup.style.top  = "-9999px";
+    popup.style.left = "-9999px";
+
+    requestAnimationFrame(() => {
+      const rect = anchorEl.getBoundingClientRect();
+
+      const viewW = window.innerWidth  || document.documentElement.clientWidth;
+      const viewH = window.innerHeight || document.documentElement.clientHeight;
+
+      const pw = popup.offsetWidth  || 280;
+      const ph = popup.offsetHeight || 180;
+
+      let top  = rect.bottom + 6;
+      let left = rect.left;
+
+      if (left + pw > viewW - 8) {
+        left = Math.max(8, rect.right - pw);
+      }
+
+      if (top + ph > viewH - 8) {
+        top = Math.max(8, rect.top - ph - 6);
+      }
+
+      popup.style.top  = top  + "px";
+      popup.style.left = left + "px";
+    });
   }
 
   const card = document.createElement("div");
@@ -334,7 +506,6 @@
     "border-radius:5px", "padding:0", "margin-top:10px", "max-width:920px"
   ].join(";");
 
-  // ── HEADER BAR ──
   const headerBar = document.createElement("div");
   headerBar.style.cssText = [
     "display:flex", "align-items:center", "justify-content:space-between",
@@ -384,7 +555,6 @@
   card.appendChild(headerDivider);
   card.appendChild(body);
 
-  // ── CONTROLS ROW ──
   const controlsRow = document.createElement("div");
   controlsRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;min-height:36px;margin-top:12px;";
 
@@ -410,7 +580,6 @@
     return `height:30px;padding:0 8px;border-radius:5px;border:1px solid ${theme.selectBorder};background:${theme.selectBg};color:${theme.selectText};font-size:12px;font-family:Arial,sans-serif;white-space:nowrap;outline:none;cursor:pointer;`;
   }
 
-  // ── TABLE TOGGLE BUTTON ──
   const tableToggleBtn = document.createElement("button");
   tableToggleBtn.className = "cfpm-icon-btn";
   tableToggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="2" width="14" height="12" rx="1.5"/><path d="M1 6h14"/><path d="M1 10h14"/><path d="M5.5 6v8"/></svg>`;
@@ -489,7 +658,6 @@
   controlsRow.appendChild(rightControls);
   body.appendChild(controlsRow);
 
-  // ── CUSTOM DATE ROW ──
   const customDateRow = document.createElement("div");
   customDateRow.style.cssText = `display:none;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;background:${theme.dropdownSection};border:1px solid ${theme.borderLight};border-radius:5px;flex-wrap:wrap;`;
 
@@ -918,15 +1086,8 @@
       const pid = cid + "-" + idx;
       let cat = classifyContest(contest);
       if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contest, unofficialForTable.has(cid));
-      if (!categoryIndexAttempts[cat]) {
-        cat = "Other";
-        if (!categoryIndexAttempts[cat]) {
-          categoryIndexAttempts[cat] = {};
-          categoryIndexTimes[cat]    = {};
-          categoryIndexSolved[cat]   = {};
-          categoryContestCount[cat]  = new Set();
-        }
-      }
+      // FIX: "Other" is always pre-initialized; removed dead inner null-check block
+      if (!categoryIndexAttempts[cat]) cat = "Other";
 
       categoryContestCount[cat].add(cid);
       categoryIndexAttempts[cat][idx] = (categoryIndexAttempts[cat][idx] || 0) + 1;
@@ -980,20 +1141,17 @@
       const tags = s.problem.tags || [];
       let cat = classifyContest(contest);
       if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contest, unofficialForList.has(cid));
+      // FIX: removed dead second null-check; "Other" is always pre-initialized
       if (!categoryRawWAMap[cat]) cat = "Other";
-      if (!categoryRawWAMap[cat]) return;
 
       if (!categoryRawWAMap[cat].has(pid)) {
         categoryRawWAMap[cat].set(pid, {
-          pid,
-          name: s.problem.name || idx,
-          contestId: cid,
-          contestName: contest.name || ("Contest " + cid),
-          index: idx,
-          rating: s.problem.rating || null,
-          tags: tags.slice(),
+          pid, name: s.problem.name || idx, contestId: cid,
+          contestName: contest.name || ("Contest " + cid), index: idx,
+          rating: s.problem.rating || null, tags: tags.slice(),
           solved: everAC.has(pid),
-          wa: 0, tle: 0, rte: 0, mle: 0, other: 0
+          wa: 0, tle: 0, rte: 0, mle: 0, other: 0,
+          acIds: [], waIds: [], tleIds: [], rteIds: [], mleIds: [], otherIds: []
         });
       }
     });
@@ -1012,15 +1170,40 @@
       const pid = cid + "-" + s.problem.index;
       let cat = classifyContest(contest);
       if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contest, unofficialForList.has(cid));
+      // FIX: removed dead second null-check; simplified combined guard
       if (!categoryRawWAMap[cat]) cat = "Other";
-      if (!categoryRawWAMap[cat] || !categoryRawWAMap[cat].has(pid)) return;
+      if (!categoryRawWAMap[cat].has(pid)) return;
 
       const vtype =
         s.verdict === "WRONG_ANSWER"          ? "wa"  :
         s.verdict === "TIME_LIMIT_EXCEEDED"   ? "tle" :
         s.verdict === "RUNTIME_ERROR"         ? "rte" :
         s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle" : "other";
-      categoryRawWAMap[cat].get(pid)[vtype]++;
+
+      const prob = categoryRawWAMap[cat].get(pid);
+      prob[vtype]++;
+      prob[vtype + "Ids"].push(s.id);
+    });
+
+    filteredSubmissions.forEach(s => {
+      if (!s.problem || s.verdict !== "OK") return;
+      const cid = s.problem.contestId;
+      if (!inContestCids.has(cid)) return;
+      const contest = contestMap[cid];
+      if (!contest) return;
+      const start = contest.startTimeSeconds;
+      const end   = start + contest.durationSeconds;
+      const st    = s.creationTimeSeconds;
+      if (typeof st !== "number" || st < start || st > end) return;
+
+      const pid = cid + "-" + s.problem.index;
+      let cat = classifyContest(contest);
+      if (cat === "Div1+Div2") cat = decideUserDivisionForContest(cid, contest, unofficialForList.has(cid));
+      // FIX: removed dead second null-check; simplified combined guard
+      if (!categoryRawWAMap[cat]) cat = "Other";
+      if (!categoryRawWAMap[cat].has(pid)) return;
+
+      categoryRawWAMap[cat].get(pid).acIds.push(s.id);
     });
 
     const categoryRawProblems = {};
@@ -1029,6 +1212,7 @@
         .filter(p => totalErrors(p) > 0);
     });
 
+    // ── PRACTICE PROBLEMS ──
     const practiceRawWAMap = new Map();
 
     filteredSubmissions.forEach(s => {
@@ -1052,15 +1236,12 @@
 
       if (!practiceRawWAMap.has(pid)) {
         practiceRawWAMap.set(pid, {
-          pid,
-          name: s.problem.name || idx,
-          contestId: cid,
-          contestName: contest.name || ("Contest " + cid),
-          index: idx,
-          rating: s.problem.rating || null,
-          tags: tags.slice(),
+          pid, name: s.problem.name || idx, contestId: cid,
+          contestName: contest.name || ("Contest " + cid), index: idx,
+          rating: s.problem.rating || null, tags: tags.slice(),
           solved: everAC.has(pid),
-          wa: 0, tle: 0, rte: 0, mle: 0, other: 0
+          wa: 0, tle: 0, rte: 0, mle: 0, other: 0,
+          acIds: [], waIds: [], tleIds: [], rteIds: [], mleIds: [], otherIds: []
         });
       }
     });
@@ -1088,17 +1269,38 @@
         s.verdict === "TIME_LIMIT_EXCEEDED"   ? "tle" :
         s.verdict === "RUNTIME_ERROR"         ? "rte" :
         s.verdict === "MEMORY_LIMIT_EXCEEDED" ? "mle" : "other";
-      practiceRawWAMap.get(pid)[vtype]++;
+
+      const prob = practiceRawWAMap.get(pid);
+      prob[vtype]++;
+      prob[vtype + "Ids"].push(s.id);
+    });
+
+    filteredSubmissions.forEach(s => {
+      if (!s.problem || s.verdict !== "OK") return;
+      const cid = s.problem.contestId;
+      const contest = contestMap[cid];
+      if (!contest) return;
+
+      let duringContest = false;
+      if (typeof contest.startTimeSeconds === "number" && typeof contest.durationSeconds === "number") {
+        const start = contest.startTimeSeconds;
+        const end   = start + contest.durationSeconds;
+        const st    = s.creationTimeSeconds;
+        if (typeof st === "number" && st >= start && st <= end) duringContest = true;
+      }
+      if (duringContest) return;
+
+      const pid = cid + "-" + s.problem.index;
+      if (!practiceRawWAMap.has(pid)) return;
+
+      practiceRawWAMap.get(pid).acIds.push(s.id);
     });
 
     const practiceRawProblems = Array.from(practiceRawWAMap.values()).filter(p => totalErrors(p) > 0);
 
     return {
-      categoryIndexTimes,
-      categoryIndexAttempts,
-      categoryIndexSolved,
-      categoryRawProblems,
-      practiceRawProblems,
+      categoryIndexTimes, categoryIndexAttempts, categoryIndexSolved,
+      categoryRawProblems, practiceRawProblems,
       participatedCount: participated.size,
       categoryContestCount: Object.fromEntries(
         Object.entries(categoryContestCount).map(([c, s]) => [c, s.size])
@@ -1194,7 +1396,6 @@
       return Array.from(tagSet).sort();
     }
 
-    // ── TOP BAR ──
     const topBar = document.createElement("div");
     topBar.style.cssText = [
       "display:flex", "align-items:center", "justify-content:space-between",
@@ -1204,7 +1405,6 @@
       `background:${theme.bg}`, "border-radius:5px 5px 0 0"
     ].join(";");
 
-    // ── SOURCE SEGMENTED CONTROL ──
     const segWrap = document.createElement("div");
     segWrap.style.cssText = `display:flex;align-items:center;background:${theme.borderLighter};border-radius:5px;padding:3px;gap:2px;flex-shrink:0;`;
 
@@ -1259,11 +1459,9 @@
       updateSourceBtns(); refreshAvailableTags(); renderList();
     });
 
-    // ── RIGHT ICON BUTTONS ──
     const rightBtns = document.createElement("div");
     rightBtns.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0;";
 
-    // ── FILTER BUTTON + DROPDOWN ──
     const filterBtnWrap = document.createElement("div");
     filterBtnWrap.style.cssText = "position:relative;display:flex;align-items:center;";
 
@@ -1277,7 +1475,6 @@
     filterDd.id = "cfpm-filter-dd";
     filterDd.style.cssText = `background:${theme.dropdownBg};border:1px solid ${theme.dropdownBorder};overflow:hidden;display:none;`;
 
-    // Min. wrong attempts section
     const minAttSection = document.createElement("div");
     minAttSection.style.cssText = `display:flex;flex-direction:column;padding:9px 12px;border-bottom:1px solid ${theme.dropdownBorder};gap:6px;`;
 
@@ -1312,7 +1509,6 @@
     minAttTopRow.appendChild(minAttControls);
     minAttSection.appendChild(minAttTopRow);
 
-    // Difficulty range section
     const ratingSection = document.createElement("div");
     ratingSection.style.cssText = `padding:9px 12px;border-bottom:1px solid ${theme.dropdownBorder};`;
 
@@ -1343,9 +1539,10 @@
     ratingMaxInput.value = localRatingMax;
     ratingMaxInput.style.cssText = `width:58px;height:26px;padding:0 6px;border-radius:4px;border:1px solid ${theme.inputBorder};background:${theme.inputBg};color:${theme.inputText};font-size:12px;font-weight:600;text-align:center;font-family:Arial,sans-serif;outline:none;box-sizing:border-box;`;
 
+    // FIX: changed display:inline to display:inline-block for correct button rendering
     const ratingClearBtn = document.createElement("button");
     ratingClearBtn.textContent = "Clear";
-    ratingClearBtn.style.cssText = `font-size:11px;font-weight:600;cursor:pointer;background:none;border:none;padding:0;outline:none;color:${theme.btnActiveBg};margin-left:auto;display:${(localRatingMin !== "" || localRatingMax !== "") ? "inline" : "none"};`;
+    ratingClearBtn.style.cssText = `font-size:11px;font-weight:600;cursor:pointer;background:none;border:none;padding:0;outline:none;color:${theme.btnActiveBg};margin-left:auto;display:${(localRatingMin !== "" || localRatingMax !== "") ? "inline-block" : "none"};`;
 
     ratingRow.appendChild(ratingLabelEl);
     ratingRow.appendChild(ratingMinInput);
@@ -1359,11 +1556,8 @@
       localRatingMax = ratingMaxInput.value;
       ratingMinGlobal = localRatingMin;
       ratingMaxGlobal = localRatingMax;
-      ratingClearBtn.style.display = (localRatingMin !== "" || localRatingMax !== "") ? "inline" : "none";
-      updateFilterBtnStyle();
-      updateSourceCounts();
-      renderList();
-      autoSave();
+      ratingClearBtn.style.display = (localRatingMin !== "" || localRatingMax !== "") ? "inline-block" : "none";
+      updateFilterBtnStyle(); updateSourceCounts(); renderList(); autoSave();
     }
 
     ratingMinInput.addEventListener("change", handleRatingChange);
@@ -1382,7 +1576,6 @@
       updateFilterBtnStyle(); updateSourceCounts(); renderList(); autoSave();
     });
 
-    // Topics section
     const topicsSection = document.createElement("div");
     topicsSection.style.cssText = `padding:9px 12px 10px 12px;`;
 
@@ -1393,9 +1586,10 @@
     topicsLabelEl.style.cssText = `font-size:12px;color:${theme.text};flex:1;font-weight:500;`;
     topicsLabelEl.textContent = "Topics";
 
+    // FIX: changed display:inline to display:inline-block for correct button rendering
     const topicClearBtn = document.createElement("button");
     topicClearBtn.textContent = "Clear";
-    topicClearBtn.style.cssText = `font-size:11px;font-weight:600;cursor:pointer;background:none;border:none;padding:0;outline:none;color:${theme.btnActiveBg};display:${localTagFilters.size > 0 ? "inline" : "none"};`;
+    topicClearBtn.style.cssText = `font-size:11px;font-weight:600;cursor:pointer;background:none;border:none;padding:0;outline:none;color:${theme.btnActiveBg};display:${localTagFilters.size > 0 ? "inline-block" : "none"};`;
 
     const addTopicBtn = document.createElement("button");
     addTopicBtn.className = "cfpm-add-topic-btn";
@@ -1424,7 +1618,7 @@
       const hasFilters = localTagFilters.size > 0;
       filterTagPillsRow.style.display  = hasFilters ? "flex" : "none";
       filterTagPillsRow.style.marginTop = hasFilters ? "7px" : "0";
-      topicClearBtn.style.display = hasFilters ? "inline" : "none";
+      topicClearBtn.style.display = hasFilters ? "inline-block" : "none";
       localTagFilters.forEach(tag => {
         const pill = document.createElement("span");
         pill.className = "cfpm-filter-tag-pill";
@@ -1437,13 +1631,7 @@
           e.stopPropagation();
           localTagFilters.delete(tag);
           activeTagFilters = new Set(localTagFilters);
-          updateFilterBtnStyle();
-          renderFilterTagPills();
-          renderTagPills();
-          renderTagListOnly();
-          updateSourceCounts();
-          renderList();
-          autoSave();
+          updateFilterBtnStyle(); renderFilterTagPills(); renderTagPills(); renderTagListOnly(); updateSourceCounts(); renderList(); autoSave();
         });
         filterTagPillsRow.appendChild(pill);
       });
@@ -1451,7 +1639,6 @@
     renderFilterTagPills();
     topicsSection.appendChild(filterTagPillsRow);
 
-    // ── TOPIC PICKER PANEL ──
     const topicPickerPanel = document.createElement("div");
     topicPickerPanel.style.cssText = [
       "position:absolute",
@@ -1469,13 +1656,9 @@
 
     const pickerHeader = document.createElement("div");
     pickerHeader.style.cssText = [
-      "padding:8px 12px 7px 12px",
-      "font-size:12px",
-      "font-weight:600",
-      `color:${theme.mutedStrong}`,
-      `border-bottom:1px solid ${theme.dropdownBorder}`,
-      `background:${theme.dropdownSection}`,
-      "flex-shrink:0"
+      "padding:8px 12px 7px 12px", "font-size:12px", "font-weight:600",
+      `color:${theme.mutedStrong}`, `border-bottom:1px solid ${theme.dropdownBorder}`,
+      `background:${theme.dropdownSection}`, "flex-shrink:0"
     ].join(";");
     pickerHeader.textContent = "Filter by topic";
 
@@ -1517,8 +1700,7 @@
     pickerDoneBtn.className = "cfpm-pill-btn";
     pickerDoneBtn.textContent = "Done";
     pickerDoneBtn.style.cssText = [
-      `background:${theme.btnActiveBg}`,
-      `color:${theme.btnActiveText}`,
+      `background:${theme.btnActiveBg}`, `color:${theme.btnActiveText}`,
       `border:1px solid ${theme.btnActiveBorder}`,
       "cursor:pointer", "font-size:11px", "height:26px",
       "padding:0 14px", "border-radius:4px", "font-weight:700"
@@ -1580,7 +1762,6 @@
     filterBtnWrap.appendChild(filterDd);
     filterBtnWrap.appendChild(topicPickerPanel);
 
-    // ── SORT BUTTON + DROPDOWN ──
     const sortBtnWrap = document.createElement("div");
     sortBtnWrap.style.cssText = "position:relative;display:flex;align-items:center;";
 
@@ -1626,8 +1807,7 @@
         descEl.textContent = desc;
         descEl.style.cssText = `font-size:11px;color:${theme.muted};`;
 
-        leftCol.appendChild(lblEl);
-        leftCol.appendChild(descEl);
+        leftCol.appendChild(lblEl); leftCol.appendChild(descEl);
         opt.appendChild(leftCol);
 
         if (isActive) {
@@ -1650,7 +1830,6 @@
     sortBtnWrap.appendChild(sortIconBtn);
     sortBtnWrap.appendChild(sortDd);
 
-    // ── VIEW OPTIONS BUTTON + DROPDOWN ──
     const viewBtnWrap = document.createElement("div");
     viewBtnWrap.style.cssText = "position:relative;display:flex;align-items:center;";
 
@@ -1676,34 +1855,24 @@
       while (viewDd.children.length > 1) viewDd.removeChild(viewDd.lastChild);
       const opts = [
         {
-          label:    "Unsolved only",
-          desc:     "Hide already-solved problems",
+          label: "Unsolved only", desc: "Hide already-solved problems",
           isActive: localHideAC,
-          toggle:   () => {
-            localHideAC = !localHideAC; hideAC = localHideAC;
-            if (localHideAC) { localSolvedOnly = false; solvedOnlyGlobal = false; }
-          }
+          toggle: () => { localHideAC = !localHideAC; hideAC = localHideAC; if (localHideAC) { localSolvedOnly = false; solvedOnlyGlobal = false; } }
         },
         {
-          label:    "Solved only",
-          desc:     "Show only solved problems",
+          label: "Solved only", desc: "Show only solved problems",
           isActive: localSolvedOnly,
-          toggle:   () => {
-            localSolvedOnly = !localSolvedOnly; solvedOnlyGlobal = localSolvedOnly;
-            if (localSolvedOnly) { localHideAC = false; hideAC = false; }
-          }
+          toggle: () => { localSolvedOnly = !localSolvedOnly; solvedOnlyGlobal = localSolvedOnly; if (localSolvedOnly) { localHideAC = false; hideAC = false; } }
         },
         {
-          label:    "Hide topic tags",
-          desc:     "Don't show topic tags",
+          label: "Hide topic tags", desc: "Don't show topic tags",
           isActive: localHideTags,
-          toggle:   () => { localHideTags = !localHideTags; hideTagsGlobal = localHideTags; }
+          toggle: () => { localHideTags = !localHideTags; hideTagsGlobal = localHideTags; }
         },
         {
-          label:    "Hide ratings",
-          desc:     "Don't show difficulty ratings",
+          label: "Hide ratings", desc: "Don't show difficulty ratings",
           isActive: localHideRatings,
-          toggle:   () => { localHideRatings = !localHideRatings; hideRatingsGlobal = localHideRatings; }
+          toggle: () => { localHideRatings = !localHideRatings; hideRatingsGlobal = localHideRatings; }
         },
       ];
 
@@ -1736,8 +1905,7 @@
         descEl.textContent = desc;
         descEl.style.cssText = `font-size:11px;color:${theme.muted};`;
 
-        leftCol.appendChild(lblEl);
-        leftCol.appendChild(descEl);
+        leftCol.appendChild(lblEl); leftCol.appendChild(descEl);
         opt.appendChild(checkBox);
         opt.appendChild(leftCol);
 
@@ -1770,7 +1938,6 @@
     topBar.appendChild(segWrap);
     topBar.appendChild(rightBtns);
 
-    // ── ACTIVE TAG PILLS ROW ──
     const tagPillRow = document.createElement("div");
     tagPillRow.style.cssText = [
       "display:none", "align-items:center", "padding:5px 12px",
@@ -1790,8 +1957,8 @@
           `color:${detectDarkMode() ? "#93c5fd" : "#1e40af"}`,
           `border:1px solid ${detectDarkMode() ? "#2d5ba6" : "#93c5fd"}`
         ].join(";");
-        const tagText  = document.createElement("span"); tagText.textContent = tag;
-        const closeX   = document.createElement("span"); closeX.textContent = "✕"; closeX.style.cssText = "opacity:0.5;font-size:9px;margin-left:1px;";
+        const tagText = document.createElement("span"); tagText.textContent = tag;
+        const closeX  = document.createElement("span"); closeX.textContent = "✕"; closeX.style.cssText = "opacity:0.5;font-size:9px;margin-left:1px;";
         pill.appendChild(tagText); pill.appendChild(closeX);
         pill.title = `Remove: ${tag}`;
         pill.addEventListener("click", () => {
@@ -1803,7 +1970,6 @@
       });
     }
 
-    // ── PROBLEM LIST ──
     const listArea = document.createElement("div");
     listArea.style.cssText = "flex:1;overflow-y:auto;min-height:0;";
 
@@ -1823,7 +1989,7 @@
       filterIconBtn.style.color       = hasFilter ? theme.btnActiveText : theme.muted;
       filterIconBtn.style.borderColor = hasFilter ? theme.btnActiveBorder : theme.btnBorder;
       filterIconBtn.title = getFilterTitle();
-      topicClearBtn.style.display = localTagFilters.size > 0 ? "inline" : "none";
+      topicClearBtn.style.display = localTagFilters.size > 0 ? "inline-block" : "none";
     }
     updateFilterBtnStyle();
 
@@ -1836,13 +2002,9 @@
     }
     updateSortBtnStyle();
 
-    // ── THE KEY FIX: always seed with ALL_CF_TAGS so every tag is always shown ──
     function renderTagListOnly() {
       tagListEl.innerHTML = "";
       const searchVal = tagSearchInput.value.toLowerCase().trim();
-
-      // Merge: always start with the full CF tag list, add any tags from current
-      // problems and any currently-selected filters (catches custom/unlisted tags too)
       const combinedTags  = new Set([...ALL_CF_TAGS, ...availableTags, ...localTagFilters]);
       const allTagsSorted = Array.from(combinedTags).sort()
         .filter(tag => !searchVal || tag.toLowerCase().includes(searchVal));
@@ -1856,7 +2018,6 @@
       }
       allTagsSorted.forEach(tag => {
         const isActive    = localTagFilters.has(tag);
-        // A tag is "available" only if it actually appears in the current problem set
         const isAvailable = availableTags.includes(tag);
         const row = document.createElement("div");
         row.className = "cfpm-tag-opt";
@@ -1897,8 +2058,11 @@
       renderFilterTagPills();
     }
 
+    // ── RENDER PROBLEM LIST ──
     function renderList() {
       listArea.innerHTML = "";
+      if (_subPopupEl) _subPopupEl.style.display = "none";
+
       const problems = applyFilters(getProblems());
       updateSourceCounts();
 
@@ -1965,6 +2129,7 @@
           row.appendChild(rb);
         }
 
+        // ── VERDICT BADGES — clickable ──
         if (errCount > 0) {
           [
             { key: "wa",    label: "WA",  bg: theme.waBadge, fg: theme.waBadgeText },
@@ -1975,26 +2140,57 @@
           ].forEach(({ key, label, bg, fg }) => {
             const cnt = p[key] || 0;
             if (!cnt) return;
+
+            const ids = p[key + "Ids"] || [];
             const badge = document.createElement("span");
+            badge.className = "cfpm-verdict-badge";
             badge.style.cssText = [
               `background:${bg}`, `color:${fg}`,
               "font-size:10px", "font-weight:700", "border-radius:3px",
-              "padding:1px 6px", "white-space:nowrap", "flex-shrink:0"
+              "padding:1px 6px", "white-space:nowrap", "flex-shrink:0",
+              "cursor:pointer", "user-select:none"
             ].join(";");
             badge.textContent = `${label} ×${cnt}`;
+            badge.title = ids.length
+              ? `Click to view ${cnt} ${label} submission${cnt > 1 ? "s" : ""}`
+              : `${cnt} ${label} submission${cnt > 1 ? "s" : ""}`;
+
+            if (ids.length) {
+              badge.addEventListener("click", e => {
+                e.stopPropagation();
+                showSubmissionPopup(badge, label, ids, p.contestId, bg, fg);
+              });
+            }
+
             row.appendChild(badge);
           });
         }
 
+        // ── AC badge ──
         const sb = document.createElement("span");
         if (p.solved) {
-          sb.style.cssText = `background:${theme.solvedBadge};color:${theme.solvedBadgeText};font-size:10px;font-weight:700;border-radius:3px;padding:1px 6px;white-space:nowrap;flex-shrink:0;`;
+          const acIds = p.acIds || [];
+          sb.style.cssText = [
+            `background:${theme.solvedBadge}`, `color:${theme.solvedBadgeText}`,
+            "font-size:10px", "font-weight:700", "border-radius:3px",
+            "padding:1px 6px", "white-space:nowrap", "flex-shrink:0",
+            acIds.length ? "cursor:pointer;user-select:none;" : ""
+          ].join(";");
           sb.textContent = errCount === 0 ? "✓ AC (1st try)" : "✓ AC";
+          sb.className = acIds.length ? "cfpm-verdict-badge" : "";
+          if (acIds.length) {
+            sb.title = `Click to view ${acIds.length} AC submission${acIds.length > 1 ? "s" : ""}`;
+            sb.addEventListener("click", e => {
+              e.stopPropagation();
+              showSubmissionPopup(sb, "AC", acIds, p.contestId, theme.solvedBadge, theme.solvedBadgeText);
+            });
+          }
         } else {
           sb.style.cssText = `background:${theme.waBadge};color:${theme.waBadgeText};font-size:10px;border-radius:3px;padding:1px 6px;white-space:nowrap;flex-shrink:0;opacity:0.7;`;
           sb.textContent = "Unsolved";
         }
         row.appendChild(sb);
+
         row.addEventListener("click", () => window.open(`https://codeforces.com/contest/${p.contestId}/problem/${p.index}`, "_blank"));
         listArea.appendChild(row);
       });
@@ -2012,11 +2208,7 @@
       filterDd.style.display = "none";
       filterOpen = false;
       updateFilterBtnStyle();
-      if (topicPickerOpen) {
-        topicPickerOpen = false;
-        updateAddTopicBtnLabel();
-        topicPickerPanel.style.display = "none";
-      }
+      if (topicPickerOpen) { topicPickerOpen = false; updateAddTopicBtnLabel(); topicPickerPanel.style.display = "none"; }
     }
     function openSortDd() {
       buildSortOptions();
@@ -2169,17 +2361,6 @@
       headRow.appendChild(th);
     });
     table.appendChild(headRow);
-
-    if (!allIdx.length) {
-      const eRow = document.createElement("tr");
-      const eTd  = document.createElement("td");
-      eTd.colSpan = 2;
-      eTd.style.cssText = `padding:12px 8px;color:${theme.emptyText};font-style:italic;font-size:12px;`;
-      eTd.textContent = "No contest data for " + cat + ".";
-      eRow.appendChild(eTd);
-      table.appendChild(eRow);
-      return;
-    }
 
     function makeRow(label, getCellContent) {
       const row = document.createElement("tr");
