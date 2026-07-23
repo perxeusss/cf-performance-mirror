@@ -65,6 +65,9 @@
   let lastModeData = null;
   let currentCategory = DEFAULT_CATEGORY;
 
+  // Change 3: session-level submission popup sort mode
+  let subPopupSortMode = "time"; // "time" | "contest"
+
   const validTimelineVals = new Set(["all","1","3","6","12","24","custom","c5","c10","c20","cc"]);
   if (!validTimelineVals.has(savedTimeline)) savedTimeline = "all";
 
@@ -411,6 +414,7 @@
     return `https://codeforces.com/${path}/${resolvedContestId}/submission/${sid}`;
   }
 
+  // Change 3: updated showSubmissionPopup with sort toggle
   function showSubmissionPopup(anchorEl, label, ids, contestId, badgeBg, badgeFg, submissionTimingMap, submissionContestMap) {
     const anchorIsLive = _subPopupAnchor && document.contains(_subPopupAnchor);
     if (anchorIsLive && _subPopupAnchor === anchorEl && _subPopupEl && _subPopupEl.style.display !== "none") {
@@ -423,6 +427,117 @@
     popup.style.border = `1px solid ${theme.dropdownBorder}`;
     popup.innerHTML = "";
 
+    // Stats table (Solved/Attempts cells) passes contestId 0 because those ids
+    // span multiple contests for the same problem index; friction panel badges
+    // always pass a real contestId since all their ids share one contest.
+    const isCrossContest = !contestId || contestId <= 0;
+
+    // Helper to build and render the sorted list
+    function buildList() {
+      const existingList = popup.querySelector("#cfpm-sub-popup-list");
+      if (existingList) existingList.remove();
+
+      const list = document.createElement("div");
+      list.id = "cfpm-sub-popup-list";
+      list.addEventListener("click", e => e.stopPropagation());
+
+      let sortedIds;
+      if (isCrossContest && subPopupSortMode === "contest") {
+        // Cross-contest only: sort by contest start time ascending
+        sortedIds = ids.slice().sort((a, b) => {
+          const cidA = submissionContestMap && submissionContestMap.get(a);
+          const cidB = submissionContestMap && submissionContestMap.get(b);
+          const startA = (cidA && contestMap[cidA]) ? contestMap[cidA].startTimeSeconds : Infinity;
+          const startB = (cidB && contestMap[cidB]) ? contestMap[cidB].startTimeSeconds : Infinity;
+          return (startA - startB) || (a - b);
+        });
+      } else {
+       // Fastest-to-slowest: sort by time-into-contest ascending, regardless
+        // of which contest each submission belongs to. Submissions with no
+        // computable contest offset (e.g. practice/upsolved submissions made
+        // outside any contest window) have no "speed" to rank, so they sort
+        // last, tie-broken by submission id ascending.
+        sortedIds = ids.slice().sort((a, b) => {
+          const metaA = submissionTimingMap && submissionTimingMap.get(a);
+          const metaB = submissionTimingMap && submissionTimingMap.get(b);
+          const offsetA = (metaA && typeof metaA.submittedAt === "number" && typeof metaA.contestStart === "number" && (metaA.submittedAt - metaA.contestStart) >= 0)
+            ? (metaA.submittedAt - metaA.contestStart) : Infinity;
+          const offsetB = (metaB && typeof metaB.submittedAt === "number" && typeof metaB.contestStart === "number" && (metaB.submittedAt - metaB.contestStart) >= 0)
+            ? (metaB.submittedAt - metaB.contestStart) : Infinity;
+          return (offsetA - offsetB) || (a - b);
+        });
+      }
+
+      sortedIds.forEach((sid, i) => {
+        const displayNumber = i + 1;
+
+        const item = document.createElement("a");
+        item.className = "cfpm-sub-link";
+
+        const url = buildSubmissionUrl(sid, contestId, submissionContestMap);
+        if (url) {
+          item.href = url;
+          item.target = "_blank"; item.rel = "noopener";
+        } else {
+          item.style.cursor = "default";
+        }
+
+        item.style.cssText = [
+          "display:flex", "align-items:center", "gap:8px", "padding:7px 12px", "text-decoration:none",
+          `color:${url ? theme.problemLink : theme.muted}`, "font-size:12px", "font-weight:600",
+          i > 0 ? `border-top:1px solid ${theme.borderLighter}` : "",
+          `background:${i % 2 === 0 ? "transparent" : (isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)")}`,
+        ].join(";");
+
+        if (url) {
+          item.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.55"><path d="M2 10L10 2M4 2h6v6"/></svg>`;
+        } else {
+          item.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.25"><circle cx="6" cy="6" r="5"/></svg>`;
+        }
+
+        const textCol = document.createElement("div");
+        textCol.style.cssText = "display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;";
+
+        const numSpan = document.createElement("span");
+        numSpan.textContent = `Submission #${sid}`;
+        textCol.appendChild(numSpan);
+
+        if (submissionTimingMap) {
+          const meta = submissionTimingMap.get(sid);
+          if (meta && typeof meta.submittedAt === "number" && typeof meta.contestStart === "number") {
+            const offsetMin = (meta.submittedAt - meta.contestStart) / 60;
+            if (offsetMin >= 0) {
+              const timeSpan = document.createElement("span");
+              timeSpan.textContent = `+${Math.round(offsetMin * 10) / 10}m into contest`;
+              timeSpan.style.cssText = `font-size:10px;color:${theme.muted};font-weight:400;`;
+              textCol.appendChild(timeSpan);
+            } else {
+              const outsideSpan = document.createElement("span");
+              outsideSpan.textContent = "solved outside contest";
+              outsideSpan.style.cssText = `font-size:10px;color:${theme.muted};font-weight:400;font-style:italic;opacity:0.7;`;
+              textCol.appendChild(outsideSpan);
+            }
+          } else {
+            const outsideSpan = document.createElement("span");
+            outsideSpan.textContent = "solved outside contest";
+            outsideSpan.style.cssText = `font-size:10px;color:${theme.muted};font-weight:400;font-style:italic;opacity:0.7;`;
+            textCol.appendChild(outsideSpan);
+          }
+        }
+
+        item.appendChild(textCol);
+
+        const idxBadge = document.createElement("span");
+        idxBadge.textContent = `#${displayNumber}`;
+        idxBadge.style.cssText = `font-size:10px;color:${theme.muted};font-weight:400;flex-shrink:0;`;
+        item.appendChild(idxBadge);
+        list.appendChild(item);
+      });
+
+      popup.appendChild(list);
+    }
+
+    // Header
     const header = document.createElement("div");
     header.style.cssText = [
       "padding:8px 12px 7px 12px", "font-size:11px", "font-weight:700",
@@ -442,98 +557,51 @@
     headerText.textContent = `${ids.length} submission${ids.length !== 1 ? "s" : ""}`;
     header.appendChild(headerText);
 
+    // Sort toggle: cross-contest popups only (Stats table). Friction panel
+    // popups are single-contest, so contest-order sorting has no meaning there.
+    if (isCrossContest) {
+      const sortToggleBtn = document.createElement("button");
+      sortToggleBtn.style.cssText = [
+        "background:none", "border:none", "cursor:pointer", "padding:0 4px",
+        "display:flex", "align-items:center", "gap:3px",
+        `color:${theme.muted}`, "font-size:10px", "font-weight:600",
+        "outline:none", "margin-left:auto", "flex-shrink:0",
+        "border-radius:3px", `border:1px solid ${theme.btnBorder}`,
+        `background:${theme.btnBg}`, "height:20px", "padding:0 6px",
+        "white-space:nowrap"
+      ].join(";");
+
+      const updateSortToggleBtn = () => {
+        sortToggleBtn.textContent = subPopupSortMode === "contest" ? "⇅ Contest Order" : "⇅ Time";
+        sortToggleBtn.title = subPopupSortMode === "contest"
+          ? "Sorted by contest date — click for submission time"
+          : "Sorted by submission time — click for contest order";
+      };
+      updateSortToggleBtn();
+
+      sortToggleBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        subPopupSortMode = subPopupSortMode === "contest" ? "time" : "contest";
+        updateSortToggleBtn();
+        buildList();
+        // Reposition after list rebuild
+        requestAnimationFrame(() => repositionPopup());
+      });
+      header.appendChild(sortToggleBtn);
+    }
+
     const closeBtn = document.createElement("span");
     closeBtn.textContent = "✕";
-    closeBtn.style.cssText = `margin-left:auto;cursor:pointer;opacity:0.45;font-size:11px;padding:2px 4px;border-radius:3px;`;
+   closeBtn.style.cssText = `cursor:pointer;opacity:0.45;font-size:11px;padding:2px 4px;border-radius:3px;${isCrossContest ? "" : "margin-left:auto;"}`;
     closeBtn.addEventListener("click", e => { e.stopPropagation(); popup.style.display = "none"; _subPopupAnchor = null; });
     closeBtn.addEventListener("mouseenter", () => { closeBtn.style.opacity = "0.8"; });
     closeBtn.addEventListener("mouseleave", () => { closeBtn.style.opacity = "0.45"; });
     header.appendChild(closeBtn);
     popup.appendChild(header);
 
-    const list = document.createElement("div");
-    list.id = "cfpm-sub-popup-list";
-    list.addEventListener("click", e => e.stopPropagation());
+    buildList();
 
-    const sortedIds = ids.slice().sort((a, b) => {
-      const tA = submissionTimingMap && submissionTimingMap.get(a);
-      const tB = submissionTimingMap && submissionTimingMap.get(b);
-      const offA = (tA && typeof tA.submittedAt === "number" && typeof tA.contestStart === "number")
-        ? (tA.submittedAt - tA.contestStart) : Infinity;
-      const offB = (tB && typeof tB.submittedAt === "number" && typeof tB.contestStart === "number")
-        ? (tB.submittedAt - tB.contestStart) : Infinity;
-      return offA - offB;
-    });
-
-    sortedIds.forEach((sid, i) => {
-      const displayNumber = i + 1;
-
-      const item = document.createElement("a");
-      item.className = "cfpm-sub-link";
-
-      const url = buildSubmissionUrl(sid, contestId, submissionContestMap);
-      if (url) {
-        item.href = url;
-        item.target = "_blank"; item.rel = "noopener";
-      } else {
-        item.style.cursor = "default";
-      }
-
-      item.style.cssText = [
-        "display:flex", "align-items:center", "gap:8px", "padding:7px 12px", "text-decoration:none",
-        `color:${url ? theme.problemLink : theme.muted}`, "font-size:12px", "font-weight:600",
-        i > 0 ? `border-top:1px solid ${theme.borderLighter}` : "",
-        `background:${i % 2 === 0 ? "transparent" : (isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)")}`,
-      ].join(";");
-
-      if (url) {
-        item.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.55"><path d="M2 10L10 2M4 2h6v6"/></svg>`;
-      } else {
-        item.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.25"><circle cx="6" cy="6" r="5"/></svg>`;
-      }
-
-      const textCol = document.createElement("div");
-      textCol.style.cssText = "display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;";
-
-      const numSpan = document.createElement("span");
-      numSpan.textContent = `Submission #${sid}`;
-      textCol.appendChild(numSpan);
-
-      if (submissionTimingMap) {
-        const meta = submissionTimingMap.get(sid);
-        if (meta && typeof meta.submittedAt === "number" && typeof meta.contestStart === "number") {
-          const offsetMin = (meta.submittedAt - meta.contestStart) / 60;
-          if (offsetMin >= 0) {
-            const timeSpan = document.createElement("span");
-            timeSpan.textContent = `+${Math.round(offsetMin * 10) / 10}m into contest`;
-            timeSpan.style.cssText = `font-size:10px;color:${theme.muted};font-weight:400;`;
-            textCol.appendChild(timeSpan);
-          } else {
-            const outsideSpan = document.createElement("span");
-            outsideSpan.textContent = "solved outside contest";
-            outsideSpan.style.cssText = `font-size:10px;color:${theme.muted};font-weight:400;font-style:italic;opacity:0.7;`;
-            textCol.appendChild(outsideSpan);
-          }
-        } else {
-          const outsideSpan = document.createElement("span");
-          outsideSpan.textContent = "solved outside contest";
-          outsideSpan.style.cssText = `font-size:10px;color:${theme.muted};font-weight:400;font-style:italic;opacity:0.7;`;
-          textCol.appendChild(outsideSpan);
-        }
-      }
-
-      item.appendChild(textCol);
-
-      const idxBadge = document.createElement("span");
-      idxBadge.textContent = `#${displayNumber}`;
-      idxBadge.style.cssText = `font-size:10px;color:${theme.muted};font-weight:400;flex-shrink:0;`;
-      item.appendChild(idxBadge);
-      list.appendChild(item);
-    });
-    popup.appendChild(list);
-
-    popup.style.display = "flex"; popup.style.top = "-9999px"; popup.style.left = "-9999px";
-    requestAnimationFrame(() => {
+    function repositionPopup() {
       if (!document.contains(anchorEl)) {
         popup.style.display = "none";
         _subPopupAnchor = null;
@@ -547,7 +615,10 @@
       if (left + pw > viewW - 8) left = Math.max(8, rect.right - pw);
       if (top + ph > viewH - 8) top = Math.max(8, rect.top - ph - 6);
       popup.style.top = top + "px"; popup.style.left = left + "px";
-    });
+    }
+
+    popup.style.display = "flex"; popup.style.top = "-9999px"; popup.style.left = "-9999px";
+    requestAnimationFrame(() => repositionPopup());
   }
 
   const card = document.createElement("div");
@@ -1052,9 +1123,10 @@
   const frictionSection = document.createElement("div");
   frictionSection.style.cssText = `margin-top:10px;border-top:1px solid ${theme.borderLight};padding-top:10px;`;
 
+  // Change 1: removed fixed height:260px; overflow is now handled by listArea's max-height
   const frictionScrollBox = document.createElement("div");
   frictionScrollBox.style.cssText = [
-    "height:260px", "overflow:visible", `border:1px solid ${theme.borderLight}`,
+    "overflow:hidden", `border:1px solid ${theme.borderLight}`,
     "border-radius:5px", "display:flex", "flex-direction:column", "padding:0", "position:relative"
   ].join(";");
 
@@ -1075,33 +1147,86 @@
     });
   }
 
+  // Change 2: updated insertCard to place extension after Problem Ratings
   function insertCard() {
     const visible = Array.from(document.querySelectorAll(".box")).filter(el => {
       const r = el.getBoundingClientRect(); return r.width > 220 && r.height > 50;
     });
+
+    // Initial insertion: after last visible .box (for width mirroring and ResizeObserver)
+    let anchorEl = null;
     if (visible.length > 0) {
-      const last = visible[visible.length - 1];
-      card.style.width = Math.round(last.getBoundingClientRect().width) + "px";
-      last.insertAdjacentElement("afterend", card);
+      anchorEl = visible[visible.length - 1];
+      card.style.width = Math.round(anchorEl.getBoundingClientRect().width) + "px";
+      anchorEl.insertAdjacentElement("afterend", card);
       if (window.ResizeObserver) {
         new ResizeObserver(entries => {
           for (const e of entries) { const nw = Math.round(e.contentRect.width); if (nw > 220) card.style.width = nw + "px"; }
-        }).observe(last);
+        }).observe(anchorEl);
       }
+    } else {
+      const main = document.querySelector("#pageContent, #mainContent, .mainContent, .content");
+      if (main) {
+        anchorEl = main;
+        card.style.width = Math.round(main.getBoundingClientRect().width) + "px";
+        main.appendChild(card);
+        if (window.ResizeObserver) {
+          new ResizeObserver(entries => {
+            for (const e of entries) { const nw = Math.round(e.contentRect.width); if (nw > 220) card.style.width = nw + "px"; }
+          }).observe(main);
+        }
+      } else {
+        document.body.appendChild(card); card.style.width = "880px";
+      }
+    }
+
+    // Now watch for the Problem Ratings box to appear, then move card after it
+    function findProblemRatingsBox() {
+      const boxes = document.querySelectorAll(".box");
+      for (const box of boxes) {
+        const headings = box.querySelectorAll("h2, h3, .title, [class*='title'], [class*='header']");
+        for (const h of headings) {
+          if (h.textContent && h.textContent.trim().toLowerCase().includes("problem ratings")) {
+            return box;
+          }
+        }
+        // Also check direct text content at top level of box
+        const firstText = box.firstElementChild;
+        if (firstText && firstText.textContent && firstText.textContent.trim().toLowerCase().includes("problem ratings")) {
+          return box;
+        }
+      }
+      return null;
+    }
+
+    // Check if Problem Ratings box already exists
+    const existingRatingsBox = findProblemRatingsBox();
+    if (existingRatingsBox && existingRatingsBox !== card) {
+      existingRatingsBox.insertAdjacentElement("afterend", card);
       return;
     }
-    const main = document.querySelector("#pageContent, #mainContent, .mainContent, .content");
-    if (main) {
-      card.style.width = Math.round(main.getBoundingClientRect().width) + "px";
-      main.appendChild(card);
-      if (window.ResizeObserver) {
-        new ResizeObserver(entries => {
-          for (const e of entries) { const nw = Math.round(e.contentRect.width); if (nw > 220) card.style.width = nw + "px"; }
-        }).observe(main);
+
+    // Watch for Problem Ratings box to be added to the DOM
+    let relocated = false;
+    const relocateObserver = new MutationObserver(() => {
+      if (relocated) return;
+      const ratingsBox = findProblemRatingsBox();
+      if (ratingsBox && ratingsBox !== card) {
+        relocated = true;
+        relocateObserver.disconnect();
+        // Small delay to let the ratings box fully render before relocating
+        setTimeout(() => {
+          ratingsBox.insertAdjacentElement("afterend", card);
+        }, 50);
       }
-      return;
-    }
-    document.body.appendChild(card); card.style.width = "880px";
+    });
+
+    relocateObserver.observe(document.body, { childList: true, subtree: true });
+
+    // Stop observing after 10 seconds to avoid leaking
+    setTimeout(() => {
+      if (!relocated) relocateObserver.disconnect();
+    }, 10000);
   }
   insertCard();
 
@@ -1110,7 +1235,9 @@
   function applyTheme() {
     card.style.background = theme.bg; card.style.border = `1px solid ${theme.border}`; card.style.color = theme.text;
     headerDivider.style.background = theme.borderLight; info.style.color = theme.muted;
-    frictionSection.style.borderTop = `1px solid ${theme.borderLight}`; frictionScrollBox.style.borderColor = theme.borderLight;
+    frictionSection.style.borderTop = `1px solid ${theme.borderLight}`;
+    // Change 1: keep frictionScrollBox without fixed height
+    frictionScrollBox.style.borderColor = theme.borderLight;
     modeSelect.style.cssText = selectStyle() + "min-width:90px;";
     customDateRow.style.background = theme.dropdownSection; customDateRow.style.borderColor = theme.borderLight;
     customContestRow.style.background = theme.dropdownSection; customContestRow.style.borderColor = theme.borderLight;
@@ -1612,8 +1739,9 @@
     _subPopupAnchor = null;
 
     frictionScrollBox.innerHTML = "";
+    // Change 1: no fixed height; listArea's max-height controls scroll
     frictionScrollBox.style.cssText = [
-      "height:260px", "overflow:visible", `border:1px solid ${theme.borderLight}`,
+      "overflow:hidden", `border:1px solid ${theme.borderLight}`,
       "border-radius:5px", "display:flex", "flex-direction:column", "padding:0", "position:relative"
     ].join(";");
 
@@ -1990,12 +2118,14 @@
     rightBtns.appendChild(filterBtnWrap); rightBtns.appendChild(sortBtnWrap); rightBtns.appendChild(viewBtnWrap);
     topBar.appendChild(segWrap); topBar.appendChild(rightBtns);
 
-    const tagPillRow = document.createElement("div");
+
+  const tagPillRow = document.createElement("div");
     tagPillRow.style.cssText = ["display:none", "align-items:center", "padding:5px 12px", `border-bottom:1px solid ${theme.borderLighter}`, "min-height:32px", "gap:5px", "flex-wrap:wrap", "flex-shrink:0"].join(";");
 
     function renderTagPills() {
       tagPillRow.innerHTML = ""; tagPillRow.style.display = localTagFilters.size > 0 ? "flex" : "none";
       if (!localTagFilters.size) return;
+
       localTagFilters.forEach(tag => {
         const pill = document.createElement("span"); pill.className = "cfpm-tag-pill";
         pill.style.cssText = [`background:${isDark ? "#16244a" : "#dbeafe"}`, `color:${isDark ? "#93c5fd" : "#1e40af"}`, `border:1px solid ${isDark ? "#2d5ba6" : "#93c5fd"}`].join(";");
@@ -2011,9 +2141,10 @@
       });
     }
 
+
     const listArea = document.createElement("div");
     listArea.className = "cfpm-list-scroll";
-    listArea.style.cssText = "flex:1;overflow-y:auto;min-height:0;width:100%;box-sizing:border-box;";
+    listArea.style.cssText = "flex:0 0 196px;overflow-y:auto;height:196px;width:100%;box-sizing:border-box;";
 
     function getFilterTitle() {
       const parts = [];
@@ -2246,11 +2377,16 @@
       sortIconBtn.style.background = theme.btnActiveBg; sortIconBtn.style.color = theme.btnActiveText; sortIconBtn.style.borderColor = theme.btnActiveBorder;
     }
     function closeSortDd() { sortDd.style.display = "none"; sortOpen = false; updateSortBtnStyle(); }
+
     function openViewDd() {
       buildViewOptions(); viewDd.style.display = "block"; viewOpen = true;
       viewIconBtn.style.background = theme.btnActiveBg; viewIconBtn.style.color = theme.btnActiveText; viewIconBtn.style.borderColor = theme.btnActiveBorder;
+      frictionScrollBox.style.overflow = "visible"; body.style.overflow = "visible";
     }
-    function closeViewDd() { viewDd.style.display = "none"; viewOpen = false; updateViewBtnStyle(); }
+    function closeViewDd() {
+      viewDd.style.display = "none"; viewOpen = false; updateViewBtnStyle();
+      frictionScrollBox.style.overflow = "hidden"; body.style.overflow = "hidden";
+    }
 
     filterIconBtn.addEventListener("click", e => {
       e.stopPropagation();
