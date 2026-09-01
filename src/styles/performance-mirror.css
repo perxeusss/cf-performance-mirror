@@ -1,0 +1,229 @@
+      #cfpm-compact { box-sizing: border-box; }
+      #cfpm-body {
+        overflow: hidden;
+        transition: max-height 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.28s ease;
+        max-height: 2000px; opacity: 1;
+      }
+      #cfpm-body.cfpm-collapsed { max-height: 0 !important; opacity: 0; pointer-events: none; }
+
+      #cfpm-chevron-btn {
+        display: flex; align-items: center; justify-content: center;
+        width: 22px; height: 22px; border-radius: 4px;
+        border: none; background: transparent; cursor: pointer;
+        flex-shrink: 0; outline: none !important;
+        -webkit-appearance: none; appearance: none; padding: 0;
+      }
+      #cfpm-chevron-btn:hover { background: rgba(128,128,128,0.1) !important; }
+      #cfpm-chevron-btn:focus, #cfpm-chevron-btn:active,
+      #cfpm-chevron-btn:focus-visible { outline: none !important; box-shadow: none !important; }
+      #cfpm-chevron-btn svg { transition: transform 0.22s cubic-bezier(0.4,0,0.2,1); }
+      #cfpm-chevron-btn.collapsed svg { transform: rotate(-90deg); }
+
+      #cfpm-compact button {
+        box-sizing: border-box; -webkit-appearance: none; appearance: none;
+        transition: none !important;
+      }
+      #cfpm-compact button:hover, #cfpm-compact button:focus,
+      #cfpm-compact button:active, #cfpm-compact button:focus-visible {
+        outline: none !important; box-shadow: none !important;
+        filter: none !important; -webkit-filter: none !important;
+      }
+
+      .cfpm-cat-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        height: 28px; padding: 0 14px; border-radius: 14px;
+        font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+        flex-shrink: 0; outline: none !important;
+      }
+      .cfpm-icon-btn {
+        width: 30px; height: 30px; border-radius: 5px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; flex-shrink: 0; outline: none !important; padding: 0;
+      }
+      .cfpm-pill-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        height: 30px; padding: 0 12px; border-radius: 5px;
+        font-size: 12px; font-weight: 600; cursor: pointer;
+        white-space: nowrap; outline: none !important;
+      }
+      .cfpm-step-btn {
+        width: 24px; height: 24px; border-radius: 4px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; flex-shrink: 0; outline: none !important;
+        -webkit-appearance: none; appearance: none;
+      }
+      .cfpm-tag-pill {
+        display: inline-flex; align-items: center; gap: 4px;
+        height: 22px; padding: 0 8px; border-radius: 11px; font-size: 11px;
+        font-weight: 600; cursor: pointer; white-space: nowrap; user-select: none;
+      }
+      .cfpm-tag-opt {
+        display: flex; align-items: center; gap: 8px;
+        padding: 6px 12px; font-size: 12px; cursor: pointer; user-select: none;
+        word-break: break-word;
+      }
+      .cfpm-tag-opt:hover { filter: brightness(0.95); }
+      .cfpm-tag-check {
+        width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 9px; color: #fff; box-sizing: border-box;
+      }
+      .cfpm-sort-opt {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 14px; font-size: 13px; cursor: pointer; user-select: none;
+      }
+      .cfpm-view-opt {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 14px; font-size: 13px; cursor: pointer; user-select: none;
+      }
+
+      #cfpm-filter-dd {
+        position: absolute; top: calc(100% + 6px); right: 0; z-index: 10000;
+        border-radius: 6px; flex-direction: column;
+        min-width: 260px; max-width: 300px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08);
+      }
+      #cfpm-sort-dd {
+        position: absolute; top: calc(100% + 6px); right: 0; z-index: 10000;
+        border-radius: 7px; overflow: hidden; min-width: 190px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.13), 0 1.5px 4px rgba(0,0,0,0.07);
+      }
+      #cfpm-view-dd {
+        position: absolute; top: calc(100% + 6px); right: 0; z-index: 10000;
+        border-radius: 7px; overflow: hidden; min-width: 210px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.13), 0 1.5px 4px rgba(0,0,0,0.07);
+      }
+
+      #cfpm-timeline-dd {
+        position: absolute; top: calc(100% + 6px); right: 0; z-index: 10000;
+        border-radius: 7px; overflow: hidden; min-width: 220px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.13), 0 1.5px 4px rgba(0,0,0,0.07);
+      }
+      .cfpm-timeline-opt {
+        display: flex; align-items: center;
+        padding: 8px 14px; font-size: 12px; cursor: pointer; user-select: none; gap: 8px;
+      }
+      .cfpm-timeline-opt:hover { filter: brightness(0.96); }
+
+      .cfpm-dropdown-header {
+        display: flex; align-items: center; gap: 6px;
+        padding: 10px 14px; box-sizing: border-box;
+        font-family: Arial, sans-serif; font-size: 13px; font-weight: 700;
+      }
+      .cfpm-back-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 18px; height: 18px; padding: 0; flex-shrink: 0;
+        border: none; background: transparent; cursor: pointer;
+        font-size: 15px; font-family: Arial, sans-serif; line-height: 1; color: inherit;
+        outline: none !important; -webkit-appearance: none; appearance: none;
+      }
+      .cfpm-back-btn:hover { opacity: 0.7; }
+
+      #cfpm-tag-list { overflow-y: auto; max-height: 110px; }
+      #cfpm-tag-list::-webkit-scrollbar { width: 4px; }
+      #cfpm-tag-list::-webkit-scrollbar-track { background: transparent; }
+      #cfpm-tag-list::-webkit-scrollbar-thumb { border-radius: 2px; background: rgba(128,128,128,0.45); min-height: 24px; }
+
+      .cfpm-rating-input::-webkit-outer-spin-button,
+      .cfpm-rating-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      .cfpm-rating-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+      .cfpm-tag-search {
+        width: 100%; box-sizing: border-box;
+        height: 30px; padding: 0 10px 0 30px;
+        font-size: 12px; font-family: inherit;
+        outline: none; border: none;
+        background: transparent;
+      }
+      .cfpm-tag-search-wrap {
+        position: relative; display: flex; align-items: center;
+      }
+      .cfpm-tag-search-wrap svg {
+        position: absolute; left: 9px; pointer-events: none; flex-shrink: 0;
+      }
+
+      .cfpm-add-topic-btn {
+        display: inline-flex; align-items: center; gap: 4px;
+        height: 22px; padding: 0 8px; border-radius: 3px;
+        font-size: 11px; font-weight: 600; cursor: pointer;
+        white-space: nowrap; outline: none !important;
+        -webkit-appearance: none; appearance: none;
+        transition: none !important;
+      }
+
+      .cfpm-filter-tag-pills {
+        display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px 8px 12px;
+      }
+      .cfpm-filter-tag-pill {
+        display: inline-flex; align-items: center; gap: 3px;
+        height: 20px; padding: 0 7px; border-radius: 10px;
+        font-size: 11px; font-weight: 600; cursor: pointer;
+        user-select: none; white-space: nowrap;
+      }
+      .cfpm-filter-tag-pill-x {
+        font-size: 9px; opacity: 0.6; margin-left: 1px;
+      }
+
+      .cfpm-verdict-badge {
+        cursor: pointer;
+        border-radius: 3px;
+        display: inline-block;
+        position: relative;
+        will-change: opacity;
+        transition: opacity 0.1s ease !important;
+      }
+      .cfpm-verdict-badge:hover {
+        opacity: 0.78 !important;
+      }
+      .cfpm-verdict-badge:active {
+        opacity: 0.60 !important;
+      }
+
+      #cfpm-sub-popup {
+        position: fixed; z-index: 999999; border-radius: 7px; overflow: hidden;
+        box-shadow: 0 10px 36px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.12);
+        display: none; flex-direction: column; min-width: 220px; max-width: 320px;
+      }
+      #cfpm-sub-popup-list { overflow-y: auto; max-height: 220px; overscroll-behavior: contain; }
+      #cfpm-sub-popup-list::-webkit-scrollbar { width: 4px; }
+      #cfpm-sub-popup-list::-webkit-scrollbar-track { background: transparent; }
+      #cfpm-sub-popup-list::-webkit-scrollbar-thumb { border-radius: 2px; background: rgba(128,128,128,0.45); min-height: 24px; }
+
+      .cfpm-sub-link {
+        display: flex; align-items: center; gap: 8px;
+        padding: 7px 12px; text-decoration: none; font-size: 12px; font-weight: 600; cursor: pointer;
+        transition: opacity 0.1s ease !important;
+      }
+      .cfpm-sub-link:hover { opacity: 0.72 !important; }
+
+      .cfpm-list-scroll::-webkit-scrollbar { width: 4px; }
+      .cfpm-list-scroll::-webkit-scrollbar-track { background: transparent; }
+      .cfpm-list-scroll::-webkit-scrollbar-thumb { border-radius: 2px; background: rgba(128,128,128,0.45); min-height: 24px; }
+
+      .cfpm-table-scroll::-webkit-scrollbar { height: 4px; }
+      .cfpm-table-scroll::-webkit-scrollbar-track { background: transparent; }
+      .cfpm-table-scroll::-webkit-scrollbar-thumb { border-radius: 2px; background: rgba(128,128,128,0.45); min-width: 24px; }
+    
+
+/* React structure uses the legacy visual language; these rules mirror the old inline layout. */
+#cfpm-compact { font-family: Arial, sans-serif; font-size: 14px; padding: 0; margin-top: 10px; max-width: 920px; border-radius: 5px; }
+#cfpm-header-divider { height: 1px; margin: 0; }
+#cfpm-body { padding: 0 14px 14px 14px; box-sizing: border-box; }
+.cfpm-controls-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; min-height:36px; margin-top:12px; }
+.cfpm-controls-left { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.cfpm-controls-right { display:flex; align-items:center; gap:7px; flex-shrink:0; }
+.cfpm-info { margin-top:2px; margin-bottom:10px; font-size:12px; }
+.cfpm-friction-section { margin-top:10px; padding-top:10px; }
+.cfpm-friction-scrollbox { overflow:hidden; border-radius:5px; display:flex; flex-direction:column; padding:0; position:relative; }
+.cfpm-table-scroll { overflow-x:auto; margin-bottom:12px; }
+
+.cfpm-inline-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}

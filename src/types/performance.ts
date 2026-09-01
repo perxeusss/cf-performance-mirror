@@ -1,0 +1,73 @@
+import type { Category, Mode } from './settings';
+
+export interface SubmissionTiming {
+  contestStart: number;
+  submittedAt: number;
+}
+
+export interface ProblemEntry {
+  pid: string;
+  name: string;
+  contestId: number;
+  contestName: string;
+  index: string;
+  rating: number | null;
+  tags: string[];
+  solved: boolean;
+  wa: number;
+  tle: number;
+  rte: number;
+  mle: number;
+  other: number;
+  acIds: number[];
+  waIds: number[];
+  tleIds: number[];
+  rteIds: number[];
+  mleIds: number[];
+  otherIds: number[];
+}
+
+export interface TimelineCustom {
+  type: 'custom';
+  start: string;
+  end: string;
+}
+
+export interface TimelineContests {
+  type: 'contests';
+  n: number;
+}
+
+export interface TimelineContestRank {
+  type: 'contestRank';
+  lo: number;
+  hi: number;
+}
+
+export type ResolvedTimeline = string | TimelineCustom | TimelineContests | TimelineContestRank;
+
+export interface ModeData {
+  categoryIndexTimes: Record<Category, Record<string, number[]>>;
+  categoryIndexAttempts: Record<Category, Record<string, number>>;
+  categoryIndexSolved: Record<Category, Record<string, number>>;
+  categoryIndexWrongIds: Record<Category, Record<string, number[]>>;
+  categoryIndexAcIds: Record<Category, Record<string, number[]>>;
+  categoryRawProblems: Record<Category, ProblemEntry[]>;
+  practiceRawProblems: ProblemEntry[];
+  participatedCount: number;
+  categoryContestCount: Record<Category, number>;
+  submissionTimingMap: Map<number, SubmissionTiming>;
+  submissionContestMap: Map<number, number>;
+}
+
+export interface DeltaInfo {
+  delta: number;
+  count: number;
+}
+
+export interface PerformanceSnapshot extends ModeData {
+  category: Category;
+  mode: Mode;
+  timeline: ResolvedTimeline;
+  deltaInfo: DeltaInfo;
+}

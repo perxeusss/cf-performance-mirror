@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "CF Performance Mirror",
+  "short_name": "CF Mirror",
+  "description": "Analyze your Codeforces performance \u2014 solve time, failure rates, rating changes, and errors by division and time range.",
+  "version": "1.0.15.7",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "CF Performance Mirror"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://codeforces.com/profile/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://codeforces.com/*"
+  ]
+}
